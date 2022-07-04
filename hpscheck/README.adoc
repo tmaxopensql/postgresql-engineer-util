@@ -1,0 +1,167 @@
+= HpsCheck
+:toc:
+:toc-title: 목차
+
+== 1. HpsCheck 개요
+
+HpsCheck는 HyperSQL PS팀이 PostgreSQL 기술지원 시 고객 지원에 필요한 컨텐츠를 담아놓은 쉘 스크립트입니다. 
+PS 팀 누구나 참여하여 더 좋은 컨텐츠를 담을 수 있게 끔 2번 항목에 내용을 정리하니, 참고하셔서 내용 수정 및 더 좋은 아이디어/컨텐츠 공유 부탁드립니다.
+
+현재는 아래와 같이 구성되어 있습니다.
+
+- hpscheck.sh : 기술지원 쉘 스크립트로, 내부에서 sql 폴더 내의 각 항목에 맞는 sql 구문을 실행합니다.
+- sql : 기술지원 쉘 스크립트에 기재된 항목에 맞는 sql 구문들이 각각 .sql 파일형태로 저장되어있습니다.
+- chkreslt : 기술지원 쉘 스크립트 옵션 중, file write 옵션이 true 일 경우, 각 데이터베이스 명의 하위 디렉토리가 생성되며, 하위 디렉토리 내부에 쉘스크립트 항목별로 텍스트 파일이 생성됩니다.
+
+
+== 2. hpscheck.sh 쉘 스크립트 항목 별 내용
+
+- 쉘 스크립트 동작 방식 개요
+
+* 쉘 실행 예시
+[source,sh]
+----
+
+-bash-4.2$ ./hpscheck.sh
+
+##### Start HyperSQL PostgreSql Check Program #####
+
+Input Database Name :
+testdb
+
+##### Database Checked #####
+
+
+Input Owner Name :
+tester
+
+##### Owner Checked #####
+
+
+Input Owner Password :
+
+##### Password Checked #####
+
+##### Write Result Files? (y/n) ##### input : n
+##### File Write Mode Off #####
+
+##### CURRENT DATABASE is testdb #####
+##### CURRENT OWNER is tester #####
+##### File Write Off #####
+
+##### SELECT CONTENTS #####
+0. Version Check
+1. Database & Owner Check
+2. Conf Check
+3. Memory Check
+4. Process Check
+5. Space Usage Check
+6. System Resource and FileSystem Check
+7. Disk I/O Check
+8. Current Session Check
+9. Top 10 Sql Check
+10. Vacuum Check
+11. Log Check
+12. Lock Check
+\c. Change Database & Owner
+\f. Change File Write mode(flag : n)
+\q. Exit Program
+#############################
+input number :
+----
+
+
+쉘을 실행하게되면, 데이터베이스명, 소유자, 패스워드, 파일 write 여부 체크 순으로 입력하게 됩니다.
+
+정확하게 순서대로 입력하게 되면 체크 할 수 있는 컨텐츠들이 보이며, input number 부분에 항목의 숫자를 입력하고 엔터를 누르면 해당 항목의 내용이 보여지게 됩니다.
+
+항목 들어갈 때마다 화면 클리어링을 시작함과 동시에 파일 write 여부 설정한 것에 따라 파일을 생성하거나 결과만 출력하게 되며, 항목 내 세부 내용은 엔터를 눌러야 다음 내용을 볼 수 있습니다.
+
+한 항목의 내용을 다 보게되면 컨텐츠 내용이 다시 나오게되는 무한 루프식으로 되어있으며, 내용을 다 체크했다면 \q 입력으로 쉘을 빠져 나올 수 있습니다.(강제종료도 가능합니다.)
+
+파일 저장을 활성화 했다면 chkreslt 디렉토리 내에 데이터베이스명 하위 디렉토리가 생성되며, 아래에 본 항목이 항목명.txt 파일 형태로 생성되어있습니다. 
+
+파일 저장 활성화는 쉘스크립트 실행 도중 끄거나 재활성화 할 수 있도록 /f 항목으로 빼놨습니다.
+
+아래는 각 항목별 쉘 스크립트 내 세부 설명입니다.
+
+=== 2.1. 스크립트 실행시 나오는 항목
+
+- 
+
+=== 2.2. Version Check
+
+=== 2.3. Database & Owner Check
+
+=== 2.4. Conf Check
+
+=== 2.5. Memory Check
+
+=== 2.6. Process Check
+
+=== 2.7. Space Usage Check
+
+=== 2.8. System Resource and FileSystem Check
+
+=== 2.9. Disk I/O Check
+
+=== 2.10. Current Session Check
+
+=== 2.11. Top 10 Sql Check
+
+=== 2.12. Vacuum Check
+
+=== 2.13. Log Check
+
+=== 2.14. Lock Check
+
+=== 2.15. 기타
+
+
+== 3. sql 폴더 내 각 sql 파일 내부 설명
+
+- dbcheck.sql
+
+- usercheck.sql
+
+- 0_version.sql
+
+- 1_dblist.sql
+
+- 2_archchk.sql
+
+- 2_pghbachk.sql
+
+- 2_vacuumchk.sql
+
+- 2_walchk.sql
+
+- 3_processmemory.sql
+
+- 3_sharedmemory.sql
+
+- 5_dbsize.sql
+
+- 5_tbixsize.sql
+
+- 5_tbssize.sql
+
+- 7_diskio.sql
+
+- 8_sessioncheck.sql
+
+- 8_transactionchk.sql
+
+- 9_sqlplan.sql
+
+- 9_topsqlchk.sql
+
+- 10_tableusage.sql
+
+- 10_tuplestate.sql
+
+- 10_vacuumcheck.sql
+
+- 10_vacuumstate.sql
+
+- 12_check_lock.sql
