@@ -1,0 +1,441 @@
+#!/bin/bash
+####################################
+##hypersql postgresql 기술지원 shell
+## File name : pgcheck.sh
+## Modified History
+## son young been (ver1.0)
+####################################
+
+echo -e ""
+echo "##### Start HyperSQL Check Program #####"
+echo -e ""
+
+defdb="postgres"
+defown="postgres"
+defpwd="postgres"
+
+while true
+do
+echo "Input Database Name : "
+read dbname
+echo -e ""
+
+result1=$(PGPASSWORD=$defpwd psql -U $defown -d $defdb -v v1="'$dbname'" -f ./sql/dbcheck.sql)
+
+if [[ "$result1" == *0* ]]; then
+ dbname="NULL"
+ echo "##### Not Found Database!! Please Retry #####"
+ echo -e ""
+ echo -e ""
+else
+ echo "##### Database Checked #####"
+ echo -e ""
+ echo -e ""
+ break;
+fi
+done
+
+while true
+do
+echo "Input Owner Name : "
+read owname
+echo -e ""
+
+result2=$(PGPASSWORD=$defpwd psql -U $defown -d $defdb -v v1="'$owname'" -f ./sql/usercheck.sql)
+
+if [[ "$result2" == *0* ]]; then
+ owname="NULL"
+ echo "##### Not Found Owner!! Please Retry #####"
+ echo -e ""
+else
+ echo "##### Owner Checked #####"
+ echo -e ""
+ echo -e ""
+ break;
+fi
+done
+
+while true
+do
+echo "Input Owner Password : "
+read -s ownpwd
+echo -e ""
+
+result3="NULL"
+result3=$(PGPASSWORD=$ownpwd psql -U $owname -d $dbname -c "select version()")
+
+if [[ "$result3" == *PostgreSQL* ]]; then
+ echo "##### Password Checked #####"
+ echo -e ""
+ break;
+else
+ echo "##### Password Incorrect!! Please Retry #####"
+ echo -e ""
+ echo -e ""
+fi
+done
+
+while true
+do
+echo "##### Write Result Files? #####"
+read -p "##### Write Result Files? (y/n) #####" ynread
+
+if [ "$ynread" == "y" ] || [ "$ynread" == "Y" ]; then
+        flag="y"
+        echo "##### File Write Mode On #####"
+        break;
+else if [ "$ynread" == "n" ] || [ "$ynread" == "N" ]; then
+        flag="n"
+        echo "##### File Write Mode Off #####"
+        break;
+else
+        echo "##### Choose y/n #####"
+        echo -e ""
+fi
+fi
+done
+
+
+while true
+do
+echo -e ""
+echo -e "##### CURRENT DATABASE is $dbname #####"
+echo -e "##### CURRENT OWNER is $owname #####"
+echo -e ""
+echo  "##### SELECT CONTENTS #####
+0. Version Check
+1. Database & Owner Check
+2. Conf Check
+3. Memory Check
+4. Process Check
+5. Space Usage Check
+6. System Resource and FileSystem Check
+7. Disk I/O Check
+8. Current Session Check
+9. Vacuum Check
+10. Log Check
+11. Lock Check
+\c. Change Database & Owner
+\q. Exit Program
+#############################"
+
+echo "input number : " 
+read num
+echo -e ""
+
+case $num in
+0)
+
+rm ./chkreslt/0_version.txt
+
+clear
+echo -e "##### Version Check #####"
+echo -e ""
+echo -e ""
+#psql -f /var/lib/pgsql/check/sql/0_version.sql
+if [ "$flag" == "y" ]; then
+        PGPASSWORD=$ownpwd psql -U $owname -d $dbname -f ./sql/0_version.sql
+        PGPASSWORD=$ownpwd psql -U $owname -d $dbname -f ./sql/0_version.sql > ./chkreslt/0_version.txt
+else
+        PGPASSWORD=$ownpwd psql -U $owname -d $dbname -f ./sql/0_version.sql
+fi
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+;;
+
+1)
+clear
+echo -e "##### Database & Owner List Check #####"
+echo -e ""
+#psql -f /var/lib/pgsql/check/sql/0_dblist.sql
+PGPASSWORD=$ownpwd psql -U $owname -d $dbname -f ./sql/1_dblist.sql
+echo -e ""
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+;;
+
+2)
+clear
+echo -e "##### Archive Setting Check #####"
+echo -e ""
+PGPASSWORD=$ownpwd psql -U $owname -d $dbname -f ./sql/2_archchk.sql
+echo -e ""
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+
+echo -e "##### Wal Setting Check #####"
+echo -e ""
+PGPASSWORD=$ownpwd psql -U $owname -d $dbname -f ./sql/2_walchk.sql
+echo -e ""
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+
+echo -e "##### Vacuum Setting Check #####"
+echo -e ""
+PGPASSWORD=$ownpwd psql -U $owname -d $dbname -f ./sql/2_vacuumchk.sql
+echo -e ""
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+
+echo -e "##### Pg_hba Setting Check #####"
+echo -e ""
+PGPASSWORD=$ownpwd psql -U $owname -d $dbname -f ./sql/2_pghbachk.sql
+echo -e ""
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+
+;;
+3)
+clear
+echo -e "##### Shared Memory Check #####"
+echo -e ""
+PGPASSWORD=$ownpwd psql -U $owname -d $dbname -f ./sql/3_sharedmemory.sql
+echo -e ""
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+
+echo -e "##### Process Memory Check #####"
+echo -e ""
+PGPASSWORD=$ownpwd psql -U $owname -d $dbname -f ./sql/3_processmemory.sql
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+;;
+
+4)
+clear
+echo "##### Process Check #####"
+echo -e ""
+ps -ef |grep postgres | awk '$1 ~ /^postgres$/ {print}' | grep -v  grep | grep -v bash | grep -v ps | grep -v awk
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+;;
+
+5)
+clear
+echo -e "##### Disk Usage Check #####"
+echo -e ""
+df -h $PGDATA
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+
+echo -e "##### Current PGDATA Usage Check #####"
+echo -e ""
+du -sh $PGDATA
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+
+echo -e "##### Current TABLESPACE Usage Check #####"
+echo -e ""
+PGPASSWORD=$ownpwd psql -U $owname -d $dbname -v v1="'$owname'" -f ./sql/5_tbssize.sql
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+
+echo -e "##### Database Size Check #####"
+echo -e ""
+PGPASSWORD=$ownpwd psql -U $owname -d $dbname -v v1="'$dbname'" -f ./sql/5_dbsize.sql
+##"select datname as database_name, pg_size_pretty(pg_database_size('$dbname')) as database_size from pg_database where datname='$dbname';"
+read -p "##### Press AnyKey #####" ynread
+
+echo -e "##### Table & Index Size Check #####"
+echo -e ""
+PGPASSWORD=$ownpwd psql -U $owname -d $dbname -f ./sql/5_tbixsize.sql
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+
+;;
+
+6)
+clear
+echo "##### Current Cpu Usage #####"
+echo ""
+vmstat 1 5
+echo ""
+read -p "##### Press AnyKey #####" ynread
+
+echo "##### DATA Files Directory Check#####"
+echo ""
+ls -al $PGDATA
+echo ""
+read -p "##### Press AnyKey #####" ynread
+
+echo "##### Wal Files Directory Check#####"
+echo ""
+ls -al $PGDATA/pg_wal
+echo ""
+read -p "##### Press AnyKey #####" ynread
+
+echo "##### Temp Files Directory Check#####"
+echo ""
+ls -al $PGDATA/pg_stat_tmp
+echo ""
+read -p "##### Press AnyKey #####" ynread
+
+echo "##### Clog Files Directory Check#####"
+echo ""
+ls -al $PGDATA/pg_xact
+echo ""
+read -p "##### Press AnyKey #####" ynread
+
+echo "##### Stat Files Directory Check#####"
+echo ""
+ls -al $PGDATA/pg_stat
+echo ""
+read -p "##### Press AnyKey #####" ynread
+
+echo "##### Log Files Directory Check#####"
+echo ""
+ls -al $PGDATA/log
+echo ""
+read -p "##### Press AnyKey #####" ynread
+
+;;
+
+7)
+clear
+echo -e "##### Disk I/O Check #####"
+echo -e ""
+PGPASSWORD=$ownpwd psql -U $owname -d $dbname -v v1="'$dbname'" -f ./sql/7_diskio.sql
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+;;
+
+8)
+clear
+echo "##### Current Session Check ##### "
+PGPASSWORD=$ownpwd psql -U $owname -d $dbname -f ./sql/8_sessioncheck.sql
+read -p "##### Press AnyKey #####" ynread
+;;
+
+9)
+clear
+echo -e "##### Tuple Check #####"
+echo -e ""
+PGPASSWORD=$ownpwd psql -U $owname -d $dbname -f ./sql/9_tuplestate.sql
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+
+echo -e "##### Table Size Check #####"
+echo -e ""
+PGPASSWORD=$ownpwd psql -U $owname -d $dbname -f ./sql/9_tableusage.sql
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+
+echo -e "##### Vacuum & Analyze Check #####"
+echo -e ""
+PGPASSWORD=$ownpwd psql -U $owname -d $dbname -f ./sql/9_vacuumcheck.sql
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+
+echo -e "##### Real-Time Vacuum Check #####"
+echo -e ""
+PGPASSWORD=$ownpwd psql -U $owname -d $dbname -f ./sql/9_vacuumstate.sql
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+;;
+
+10)
+clear
+echo "##### PGLOG Check #####"
+echo ""
+ls -alrt /var/lib/pgsql/14/data/log
+echo ""
+read -p "##### Press AnyKey #####" ynread
+
+echo "##### PGLOG Error Check #####"
+echo ""
+grep -i 오류 /var/lib/pgsql/14/data/log/postgresql*
+echo ""
+read -p "##### Press AnyKey #####" ynread
+;;
+
+11)
+clear
+echo -e "##### Lock Check #####"
+#psql -f /var/lib/pgsql/check/sql/0_version.sql ##version check
+PGPASSWORD=$ownpwd psql -U $owname -d $dbname -f ./sql/11_check_lock.sql
+echo -e ""
+read -p "##### Press AnyKey #####" ynread
+
+;;
+
+
+
+\c)
+
+while true
+do
+echo "Input Database Name : "
+read dbname
+echo -e ""
+
+result1=$(PGPASSWORD=$defpwd psql -U $defown -d $defdb -v v1="'$dbname'" -f ./sql/dbcheck.sql)
+
+if [[ "$result1" == *0* ]]; then
+ dbname="NULL"
+ echo "##### Not Found Database!! Please Retry #####"
+ echo -e ""
+ echo -e ""
+else
+ echo "##### Database Checked #####"
+ echo -e ""
+ echo -e ""
+ break;
+fi
+done
+
+while true
+do
+echo "Input Owner Name : "
+read owname
+echo -e ""
+
+result2=$(PGPASSWORD=$defpwd psql -U $defown -d $defdb -v v1="'$owname'" -f ./sql/usercheck.sql)
+
+if [[ "$result2" == *0* ]]; then
+ owname="NULL"
+ echo "##### Not Found Owner!! Please Retry #####"
+ echo -e ""
+else
+ echo "##### Owner Checked #####"
+ echo -e ""
+ echo -e ""
+ break;
+fi
+done
+
+while true
+do
+echo "Input Owner Password : "
+read ownpwd
+echo -e ""
+
+result3="NULL"
+result3=$(PGPASSWORD=$ownpwd psql -U $owname -d $dbname -c "select version()")
+
+if [[ "$result3" == *PostgreSQL* ]]; then
+ echo "##### Password Checked #####"
+ echo -e ""
+ break;
+else
+ echo "##### Password Incorrect!! Please Retry #####"
+ echo -e ""
+ echo -e ""
+fi
+done
+
+;;
+
+\q)
+echo "##### Check Finish!! #####"
+break;;
+
+"")
+continue
+;;
+
+*)
+echo "##### Wrong Number!!! #####"
+
+esac
+
+done
