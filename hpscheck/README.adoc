@@ -795,4 +795,15 @@ WHERE NOT blocked_locks.granted;
 
 == 4. WAIT_EVENT_TYPE, WAIT_EVENT, BACKEND_TYPE 유형 정리
 
+* WAIT_EVENT_TYPE 유형 정리
+[width="80%",cols="^2,10",options="header"]
+|===
+|WAIT EVENT TYPE |Descryption
+
+|Activity 
+|서버 프로세스가 유휴 상태.
+
+|===
+
+
 == 5. pg_locks에서의 locktype과 mode 유형 정리
