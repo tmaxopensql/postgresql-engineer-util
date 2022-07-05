@@ -745,7 +745,7 @@ from
 ----
 SELECT
         t.relname,
-        l.locktype, -- lock 개체 유형, 별도 정리
+        l.locktype, -- lock 개체 유형, wait_event_type의 lock 유형의 wait event 항목을 나타냄
         page,
         virtualtransaction, -- lock을 보유하거나 대기 중인 트랜잭션의 가상 ID
         pid, -- 이 lock을 보유하거나 기다리는 서버 프로세스의 id
@@ -832,99 +832,34 @@ WHERE NOT blocked_locks.granted;
 |===
 
 * WAIT_EVENT 유형 정리
-- Activity
-[width="80%",cols="^2,10",options="header"]
-|===
-|WAIT EVENT | Descryption
 
-|ArchiverMain
-|Archiver 프로세스의 메인 루프에서 대기 중
+- Activity +
+https://www.postgresql.org/docs/current/monitoring-stats.html#WAIT-EVENT-ACTIVITY-TABLE
 
-|AutoVacuumMain
-|autovacuum launcher 프로세스의 메인 루프에서 대기 중
+- BufferPin +
+https://www.postgresql.org/docs/current/monitoring-stats.html#WAIT-EVENT-BUFFERPIN-TABLE
 
-|BgWriterHibernate
-|BgWriter 프로세스 대기 중, 최대 절전 모드
+- Client +
+https://www.postgresql.org/docs/current/monitoring-stats.html#WAIT-EVENT-CLIENT-TABLE
 
-|BgWriterMain
-|BgWriter 프로세스의 메인 루프에서 대기 중
+- Extension +
+https://www.postgresql.org/docs/current/monitoring-stats.html#WAIT-EVENT-EXTENSION-TABLE
 
-|CheckpointerMain
-|Checkpointer 프로세스의 메인 루프에서 대기 중
+- IO +
+https://www.postgresql.org/docs/current/monitoring-stats.html#WAIT-EVENT-IO-TABLE
 
-|LogicalApplyMain
-|logial replication apply 프로세스의 메인 루프에서 대기 중
+- IPC +
+https://www.postgresql.org/docs/current/monitoring-stats.html#WAIT-EVENT-IPC-TABLE
 
-|LogicalLauncherMain
-|logical replication launcher 프로세스의 메인 루프에서 대기 중
+- Lock +
+https://www.postgresql.org/docs/current/monitoring-stats.html#WAIT-EVENT-LOCK-TABLE
 
-|PgStatMain
-|statistics collector 프로세스의 메인 루프에서 대기 중
+- LWLock +
+https://www.postgresql.org/docs/current/monitoring-stats.html#WAIT-EVENT-LWLOCK-TABLE
 
-|RecoveryWalStream
-|streaming recovery 중 startup 프로세스의 메인 루프에서 wal이 도착하기를 대기
+- Timeout +
+https://www.postgresql.org/docs/current/monitoring-stats.html#WAIT-EVENT-TIMEOUT-TABLE
 
-|SysLoggerMain
-|syslogger 프로세스의 메인 루프에서 대기 중
-
-|WalReceiverMain
-|WAL receiver 프로세스의 메인 루프에서 대기 중
-
-|WalSenderMain
-|WAL sender 프로세스의 메인 루프에서 대기 중
-
-|WalWriterMain
-|WAL writer 프로세스의 메인 루프에서 대기 중
-
-|===
-
-- BufferPin
-[width="80%",cols="^2,10",options="header"]
-|===
-|WAIT EVENT | Descryption
-|===
-
-- Client
-[width="80%",cols="^2,10",options="header"]
-|===
-|WAIT EVENT | Descryption
-|===
-
-- Extension
-[width="80%",cols="^2,10",options="header"]
-|===
-|WAIT EVENT | Descryption
-|===
-
-- IO
-[width="80%",cols="^2,10",options="header"]
-|===
-|WAIT EVENT | Descryption
-|===
-
-- IPC
-[width="80%",cols="^2,10",options="header"]
-|===
-|WAIT EVENT | Descryption
-|===
-
-- Lock
-[width="80%",cols="^2,10",options="header"]
-|===
-|WAIT EVENT | Descryption
-|===
-
-- LWLock
-[width="80%",cols="^2,10",options="header"]
-|===
-|WAIT EVENT | Descryption
-|===
-
-- Timeout
-[width="80%",cols="^2,10",options="header"]
-|===
-|WAIT EVENT | Descryption
-|===
 
 * BACKEND_TYPE 유형 정리
 - autovacuum launcher
@@ -942,4 +877,14 @@ WHERE NOT blocked_locks.granted;
 - walwriter
 
 
-== 5. pg_locks에서의 locktype과 mode 유형 정리
+== 5. pg_locks에서의 mode 유형 정리
+mode 에서 나타나는 유형은 Table-Level Locks에 해당하는 모드들과, Row-Level Locks에 해당하는 모드들이 나타남. 그리고 Serializable Isolation Level도 참조 함.
+
+* Table-Level Locks +
+https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-TABLES
+
+* Row-Level Locks +
+https://www.postgresql.org/docs/current/transaction-iso.html#XACT-SERIALIZABLE
+
+* Serializable Isolation Level +
+https://www.postgresql.org/docs/current/transaction-iso.html#XACT-SERIALIZABLE
