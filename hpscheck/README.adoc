@@ -101,39 +101,77 @@ input number :
 소유자의 패스워드를 넣으며, 해당 패스워드로 접속을 해서 select version() 쿼리를 실행합니다. 결과값이 나오면 패스워드 입력이 성공, 안나오면 틀리다고 판정하여 패스워드가 틀릴 경우 다시 입력하라는 메시지를 띄우며 정확하게 작성 될 때까지 무한 반복됩니다.
 
 - Write Result Files? (y/n) input : +
-파일을 chkreslt 폴더 내에 위 database name에서 입력한 db명으로 하위디렉토리 생성하여 작성할지 안할지를 y또는 n을 입력해서 flag 값을 y또는 n으로 설정합니다. flag 값은 아래 항목에서 파일을 쓸 때, 안쓸 때 구분하기 위한 용도로 사용됩니다.
+파일을 chkreslt 폴더 내에 위 database name에서 입력한 db명으로 하위디렉토리 생성하여 작성할지 안할지를 y또는 n을 입력해서 flag 값을 y또는 n으로 설정합니다. 파일 write 부분은  if ~ else 구문에서 파일을 쓸 때, 안쓸 때 분기구분하도록 되어있는데 flag 값은 이때 사용됩니다.
 
 전부 입력하게 되면 현재 DB, 소유자, 파일 write mode 여부와 함께 점검 항목을 보여줍니다.
 
 === 2.2. Version Check
 
-
+0_version.sql 구문을 실행하는 부분이며 현재 PostgreSQL의 버전을 보여주는 항목입니다. 파일을 쓰게 되면 0_version.txt 파일명으로 남기게 됩니다.
 
 === 2.3. Database & Owner Check
 
+1_dblist.sql 구문을 실행하는 부분이며 데이터베이스 목록과 소유자 목록을 보여주는 항목입니다. 파일을 쓰게되면 1_dbownerchk.txt 파일명으로 남기게 됩니다.
+
 === 2.4. Conf Check
+
+2_archchk.sql, 2_pghback.sql, 2_vacuumchk.sql, 2_walchk.sql 구문들을 실행하는 부분이며 postgresql.conf에서 archive 세팅목록, vacuum 세팅목록, wal 세팅목록을, pg_hba.conf에서 접근제어 설정이 어떻게 되어있는지 query 결과로 보여주는 항목입니다. 파일을 쓰게되면 2_confchk.txt 파일명으로 남기게 됩니다.
 
 === 2.5. Memory Check
 
+3_processmemory.sql, 3_sharedmemory.sql 구문들을 실행하는 부분이며 postgresql.conf에 설정된 메모리 값을 보여주고, CLOG buffer 값도 계산하여 볼 수 있습니다. vacuum 버퍼 값 계산은 스터디 후에 수정여지가 있다면 진행해야합니다. 파일을 쓰게되면 3_memchk.txt 파일명으로 남기게 됩니다.
+
 === 2.6. Process Check
+
+따로 sql 구문을 활용하지 않으며 프로세스를 확인할 수 있는 ps -ef 명령어로 현재 postgresql의 프로세스를 보여줍니다. 필요없는 부분은 grep 구문으로 자르고 보여주도록 되어있으며 현재 아래와 같이 설정했습니다.
+[source,sh]
+----
+ps -ef |grep postgres | awk '$1 ~ /^postgres$/ {print}' | grep -v  grep | grep -v bash | grep -v ps | grep -v idle | grep -v awk
+----
+
+추후 postgresql을 실행하는 유저명이 다를경우, 추가되는 extension 체크를 위해 수정할 여지가 있습니다. 파일ㅇ르 쓰게되면 4_processchk.txt 파일명으로 남기게 됩니다.
 
 === 2.7. Space Usage Check
 
+5_dbsize.sql, 5_tbixsize.sql, 5_tbssize.sql 구문을 실행하는 부분이며, 물리적인 디스크 용량을 확인 하기 위해 쉘 명령어도 포함됩니다. 쉘 명령어는 df -h와 du -sh가 사용되며, $PGDATA경로의 물리적인 용량을 체크합니다. 그러면서 쉘에 입력하고 들어온 데이터베이스의 사이즈와 쉘에 입력하고 들어온 소유자가 가진 테이블 스페이스 사이즈를 확인합니다. 그리고 데이터베이스가 가지고있는 테이블들과 인덱스, 그리고 total relation 사이즈를 볼 수 있습니다. 파일을 쓰게되면 5_spaceusage.txt 파일명으로 남기게 됩니다.
+
 === 2.8. System Resource and FileSystem Check
+
+따로 sql 구문을 활용하지 않으며 현 서버의 리소스와 cpu, 메모리 사용량을 vmstat으로 보여줍니다. 그리고 postgresql 파일 시스템들의 디렉토리 내용을 보여줍니다. 이부분은 vmstat 및 top에 관련된 세미나 이후 수정될 여지가 있으며, 파일 시스템들의 디렉토리 내용을 보여주기보다 디렉토리 경로를 보여주는 방식으로 수정 될 예정입니다. 파일을 쓰게되면 6_resourcechk.txt 파일명으로 남기게 됩니다.
 
 === 2.9. Disk I/O Check
 
+7_diskio.sql 구문을 실행하는 부분이며 데이터베이스(buffercache) I/O 및 hit ratio, 테이블 I/O 및 hit ratio, 인덱스 I/O 및 hit ratio, 시퀀스 I/O 및 hit ratio, SLRU(simple least-recently_used) I/O 및 hit ratio를 볼 수 있습니다. 등급은 90% 이상이면 good, 미만이면 bad, read와 hit 값이 없으면 not work로 구분됩니다. 등급은 내부 기준을 만들어서 세분화가 필요합니다. 파일을 쓰게되면 7_diskiochk.txt 파일명으로 남기게 됩니다.
+
 === 2.10. Current Session Check
+
+8_sessioncheck.sql, 8_transactionchk.sql 구문들을 실행하는 부분이며 현재 세션과 트랜잭션을 볼 수 있습니다. 파일을 쓰게 되면 8_cursessionchk.txt 파일명으로 남기게 됩니다.
 
 === 2.11. Top 10 Sql Check
 
+9_sqlplan.sql, 9_topsqlchk.sql 구문들을 실행하는 부분이며 실행시간이 제일 많은 10가지 query를 볼 수 있습니다. 그 query에 관련된 plan을 explain verbose 구문을 사용하여 보여주려 했으나, select 이외의 구문이 실행되면 운영에 크리티컬 하기 때문에 전면 수정했으며, 쿼리의 plan정보를 볼 수 있는 시스템 카탈로그를 찾고 공부하여 추가해야합니다. 또한 query는 query id값만 보여주도록하여 좀 더 보기 편하게 수정할 계획입니다. 파일을 쓰게되면 9_topsqlchk.tx 파일명으로 남기게 됩니다.
+
 === 2.12. Vacuum Check
+
+10_tableusage.sql, 10_tuplestate.sql, 10_vacuumcheck.sql, 10_vacuumstate.sql 구문들을 실행하는 부분이며 live tuple, dead tuple과 live tuple의 비율을 볼수 있고, 테이블 사이즈와 vacuum과 analyze가 실행되었던 기록을 볼 수 있습니다. vacuum이 postgresql에서 중요한 부분이므로 스터디를 통해 내용을 보완해야 합니다. 파일을 쓰게되면 10_vacuumchk.txt 파일명으로 남기게 됩니다.
 
 === 2.13. Log Check
 
+따로 sql 구문을 활용하지 않으며 $PGDATA의 log 디렉토리에 쌓인 로그들과, 오류 내용을 grep 해서 볼 수 있습니다. 로그 정책을 수립하게되면 수정할 부분입니다. 파일을 쓰게되면 11_logchk.txt 파일명으로 남기게 됩니다.
+
 === 2.14. Lock Check
 
+12_check_lock.sql 구문을 실행하는 부분이며 현재 lock 관련된 부분을 확인 할 수 있고, block된 lock도 볼 수 있습니다. lock 관련 부분도 모든 DB에서 중요한 만큼 더 스터디하여 내용을 보충해야합니다. 파일을 쓰게되면 12_lockchk.txt 파일명으로 남기게 됩니다.
+
 === 2.15. 기타
+
+항목 중 숫자가아닌 \c, \f, \q 부분 관련입니다. +
+
+\c는 check shell 을 빠져나가지 않고 실행하는 도중에 데이터베이스와 소유자를 변경할 수 있는 항목입니다. 로직은 처음에 실행되는 부분과 똑같이 입력하도록 되어있습니다.
+
+\f는 파일을 write 여부를 바꿀 수 있는 부분이며, 마찬가지로 check shell을 빠져나가지 않고 실행하는 도중에 바꿀 수 있습니다. 다른 입력값 없이 /f 누르면 바로 write 모드가 바뀌게 되며, 바뀐 여부도 같이 출력됩니다.
+
+\q는 실행도중 빠져나갈수 있는 값으로, 강제종료 외에 \q 외에 다른 입력값을 넣게되면 잘못된 입력값이라는 문구와 함께 계속 루프를 돌게 됩니다.
 
 
 == 3. sql 폴더 내 각 sql 파일 내부 설명
