@@ -832,6 +832,99 @@ WHERE NOT blocked_locks.granted;
 |===
 
 * WAIT_EVENT 유형 정리
+- Activity
+[width="80%",cols="^2,10",options="header"]
+|===
+|WAIT EVENT | Descryption
+
+|ArchiverMain
+|Archiver 프로세스의 메인 루프에서 대기 중
+
+|AutoVacuumMain
+|autovacuum launcher 프로세스의 메인 루프에서 대기 중
+
+|BgWriterHibernate
+|BgWriter 프로세스 대기 중, 최대 절전 모드
+
+|BgWriterMain
+|BgWriter 프로세스의 메인 루프에서 대기 중
+
+|CheckpointerMain
+|Checkpointer 프로세스의 메인 루프에서 대기 중
+
+|LogicalApplyMain
+|logial replication apply 프로세스의 메인 루프에서 대기 중
+
+|LogicalLauncherMain
+|logical replication launcher 프로세스의 메인 루프에서 대기 중
+
+|PgStatMain
+|statistics collector 프로세스의 메인 루프에서 대기 중
+
+|RecoveryWalStream
+|streaming recovery 중 startup 프로세스의 메인 루프에서 wal이 도착하기를 대기
+
+|SysLoggerMain
+|syslogger 프로세스의 메인 루프에서 대기 중
+
+|WalReceiverMain
+|WAL receiver 프로세스의 메인 루프에서 대기 중
+
+|WalSenderMain
+|WAL sender 프로세스의 메인 루프에서 대기 중
+
+|WalWriterMain
+|WAL writer 프로세스의 메인 루프에서 대기 중
+
+|===
+
+- BufferPin
+[width="80%",cols="^2,10",options="header"]
+|===
+|WAIT EVENT | Descryption
+|===
+
+- Client
+[width="80%",cols="^2,10",options="header"]
+|===
+|WAIT EVENT | Descryption
+|===
+
+- Extension
+[width="80%",cols="^2,10",options="header"]
+|===
+|WAIT EVENT | Descryption
+|===
+
+- IO
+[width="80%",cols="^2,10",options="header"]
+|===
+|WAIT EVENT | Descryption
+|===
+
+- IPC
+[width="80%",cols="^2,10",options="header"]
+|===
+|WAIT EVENT | Descryption
+|===
+
+- Lock
+[width="80%",cols="^2,10",options="header"]
+|===
+|WAIT EVENT | Descryption
+|===
+
+- LWLock
+[width="80%",cols="^2,10",options="header"]
+|===
+|WAIT EVENT | Descryption
+|===
+
+- Timeout
+[width="80%",cols="^2,10",options="header"]
+|===
+|WAIT EVENT | Descryption
+|===
 
 * BACKEND_TYPE 유형 정리
 - autovacuum launcher
