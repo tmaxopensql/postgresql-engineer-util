@@ -675,6 +675,11 @@ else
 fi
 ;;
 9)
+	rm ./chkreslt/$dirname/8_cursessionchk.txt
+	
+clear
+
+if [ "$flag" == "y" ]; then
 	echo -e "##### Top 10 Sql Check #####"
 	echo -e "##### Top 10 Sql Check #####" > ./chkreslt/$dirname/9_topsqlchk.txt
 	echo -e ""
@@ -696,6 +701,23 @@ fi
 	#find /var/lib/pgsql/check/sql -name "99_extra.sql" -exec perl -pi -e 's/\\n/ /g' {} \;
         echo -e ""
         echo -e "" >> ./chkreslt/$dirname/9_topsqlchk.txt
+        read -p "##### Press Enter #####" ynread
+        echo -e ""
+
+else
+	echo -e "##### Top 10 Sql Check #####"
+        echo -e ""
+        PGPASSWORD=$ownpwd psql -U $owname -d $dbname -v v1="'$dbname'" -f ./sql/9_topsqlchk.sql
+        echo -e ""
+        read -p "##### Press Enter #####" ynread
+        echo -e ""
+
+        echo -e "##### Top 10 sql plan Check #####"
+        echo -e ""
+        PGPASSWORD=$ownpwd psql -U $owname -d $dbname -v v1="'$dbname'" -f ./sql/9_sqlplan.sql
+
+        #find /var/lib/pgsql/check/sql -name "99_extra.sql" -exec perl -pi -e 's/\\n/ /g' {} \;
+        echo -e ""
         read -p "##### Press Enter #####" ynread
         echo -e ""
 
