@@ -801,7 +801,32 @@ WHERE NOT blocked_locks.granted;
 |WAIT EVENT TYPE |Descryption
 
 |Activity 
-|서버 프로세스가 유휴 상태.
+|서버 프로세스가 유휴 상태. 이 유형은 main processing loop에서 activity를 기다리는 프로세스
+
+|BufferPin
+|서버 프로세스가 데이터 버퍼에 대한 단독 액세스를 기다리는 상태. 다른 프로세스가 문제의 버퍼에서 마지막으로 데이터를 읽은 open 커서를 보유하는 경우 버퍼 핀 대기가 길어질 수 있음
+
+|Client 
+|서버 프로세스는 사용자 응용 프로그램에 연결된 소켓에서 activity를 기다림. 서버는 내부 프로세스와의 독립이 발생할 것이라 기대
+
+|Extension 
+|서버 프로세스는 extension 모듈에 의해 정의된 일부 조건을 기다림
+
+|IO 
+|서버 프로세스가 I/O 작업이 완료되기를 기다림
+
+|IPC 
+|서버 프로세스가 유휴 상태. 이 유형은 main processing loop에서 activity를 기다리는 프로세스
+
+|LOCK
+|서버 프로세스가 heavyweight lock을 기다림. heavyweight lock은 주로 테이블과 같이 sql에서 볼수 있는 개체를 보호함. 또한 특정 내부 작업에 대한 상호 배제를 보장하는데 사용됨
+
+|LWLOCK 
+|서버 프로세스가 lightweight lock을 기다림. 공유메모리의 특정 데이터 구조를 보호함
+
+|Timeout
+|서버 프로세스가 시간 초과가 만료되기를 기다리는 상태
+
 
 |===
 
