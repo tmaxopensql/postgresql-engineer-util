@@ -338,7 +338,6 @@ show shared_buffers;
 
 show wal_buffers;
 
-/*CLOG buffers not have parameters*/
 select pg_size_pretty(trunc(txid_current()*2/8/8192,0)*8192 + 8192) as clog_buffers; --clog 계산식
 
 show max_locks_per_transaction;
@@ -385,6 +384,7 @@ FROM
         pg_class C, pg_namespace N
 where
         N.oid = C.relnamespace and nspname NOT IN ('pg_catalog', 'information_schema') AND nspname !~ '^pg_toast' AND relkind IN ('r')
+        --시스템 카탈로그 관련 스키마, toast 이름붙은 스키마 제외하고 select 하도록 설정
 )a),
 tables as
 (
@@ -398,6 +398,7 @@ SELECT
         pg_size_pretty(pg_relation_size(C.oid, 'fsm')) AS relation_fsm_size,
         pg_size_pretty(pg_relation_size(C.oid, 'vm')) AS relation_vm_size,
         pg_size_pretty(pg_relation_size(C.oid, 'init')) AS relation_init_size
+        --relation 세부항목을 pg_relation_size에 기입하면 각 세부항목별 사이즈 볼 수 있음
 FROM
         pg_class C, pg_namespace N
 where
@@ -424,6 +425,7 @@ SELECT
         'all_tables'::text AS table_name,
         'all_indexes'::text AS index_name,
         pg_size_pretty(sum(pg_relation_size(i.indexname::TEXT))) AS index_size
+        --index명을 넣으면 pg_relation_size함수로 index의 사이즈 확인 가능함
 FROM
         pg_class C Left OUTER JOIN pg_indexes i on  C.relname = i.tablename,
         pg_namespace N
@@ -497,7 +499,8 @@ select
         s.usename as owner,
         t.spcname as tablespace_name,
         d.datname as database_name,
-        pg_tablespace_location(t.oid) as tablespace_directory,
+        pg_tablespace_location(t.oid) as tablespace_directory, 
+        -- 테이블 스페이스의 oid를 pg_tablespace_location 함수의 인자로 넣으면 경로를 표시해줌
         pg_size_pretty(pg_tablespace_size(spcname)) as tablespace_size
 from
         pg_tablespace t, pg_shadow s, pg_database d
@@ -509,21 +512,287 @@ where
 
 
 - 7_diskio.sql
+[source,sql]
+----
+/*<database hit(buffercache hit)>*/
+SELECT
+        'database I/O' as hit_object,
+        coalesce(sum(blks_read),0) as "Database Disk Read", --read 횟수
+        coalesce(sum(blks_hit),0) as "Database Cache Hit", --hit 횟수
+        coalesce(round(sum(blks_hit)*100/sum(blks_hit + blks_read),2),0)||'%' as "Buffer Cache Hit Ratio",
+        CASE WHEN coalesce(round(sum(blks_hit)*100/sum(blks_hit + blks_read),2),0) >= 90.00 then 'Good' -- 비율이 90이상이면
+             WHEN coalesce(sum(blks_read),0) = 0 and coalesce(sum(blks_hit),0)=0 then 'Not Work' --read 횟수와 hit 횟수가 0이라면
+             ELSE 'Bad' END AS "CHECK" -- 그 외는 90미만이므로 
+FROM
+        pg_stat_database
+WHERE
+        datname = :v1;
+
+/*<table hit>*/
+SELECT
+        'table I/O' as hit_object,
+        coalesce(sum(heap_blks_read),0) as "Table Disk Read",
+        coalesce(sum(heap_blks_hit),0) as "Table Cache Hit",
+        coalesce(round(sum(heap_blks_hit)*100 / sum(heap_blks_hit + heap_blks_read),2),0)||'%' as "Table Cache Hit Ratio",
+        CASE WHEN coalesce(round(sum(heap_blks_hit)*100/sum(heap_blks_hit + heap_blks_read),2),0) >= 90.00 then 'Good'
+             WHEN coalesce(sum(heap_blks_read),0) = 0 and coalesce(sum(heap_blks_hit),0) = 0 then 'Not Work'
+             ELSE 'Bad' END AS "CHECK"
+FROM
+        pg_statio_user_tables;
+
+/*<index hit>*/
+SELECT
+        'index I/O' as hit_object,
+        coalesce(sum(idx_blks_read),0) as "Idx Disk Read",
+        coalesce(sum(idx_blks_hit),0)  as "Idx Cache Hit",
+        coalesce(round(sum(idx_blks_hit)*100/ sum(idx_blks_hit + idx_blks_read),2),0)||'%' as "Idx Hit Ratio",
+        CASE WHEN coalesce(round(sum(idx_blks_hit)*100/sum(idx_blks_hit + idx_blks_read),2),0) >= 90.00 then 'Good'
+             WHEN coalesce(sum(idx_blks_read),0) = 0 and coalesce(sum(idx_blks_hit),0) = 0 then 'Not Work'
+             ELSE 'Bad' END AS "CHECK"
+FROM
+        pg_statio_user_indexes;
+
+/*<sequence hit>*/
+SELECT
+        'sequence I/O' as hit_object,
+        coalesce(sum(blks_read),0) as "Sequence Disk Read",
+        coalesce(sum(blks_hit),0) as "Sequence Cache Hit",
+        coalesce(round(sum(blks_hit)*100/sum(blks_hit + blks_read),2),0)||'%' as "Sequence Hit Ratio",
+        CASE WHEN coalesce(round(sum(blks_hit)*100/sum(blks_hit + blks_read),2),0) >= 90.00 then 'Good'
+             WHEN coalesce(sum(blks_read),0) = 0 and coalesce(sum(blks_hit),0)=0 then 'Not Work'
+             ELSE 'Bad' END AS "CHECK"
+FROM
+        pg_statio_user_sequences;
+
+/*<slru(simple least-recently-used)>*/
+SELECT
+        'slru I/O' as hit_object,
+        coalesce(sum(blks_read),0) as "SLRU Disk Read",
+        coalesce(sum(blks_hit),0) as "SLRU Cache Hit",
+        coalesce(round(sum(blks_hit)*100/sum(blks_hit + blks_read),2),0)||'%' as "SLRU Hit Ratio",
+        CASE WHEN coalesce(round(sum(blks_hit)*100/sum(blks_hit + blks_read),2),0) >= 90.00 then 'Good'
+             WHEN coalesce(sum(blks_read),0) = 0 and coalesce(sum(blks_hit),0)=0 then 'Not Work'
+             ELSE 'Bad' END AS "CHECK"
+FROM
+        pg_stat_slru;
+
+----
+
+모든 I/O 항목 공통으로 read 횟수와 hit 횟수를 통해 hit 비율을 따져서 hit ratio를 계산합니다. 데이터베이스 별로 볼 수 있도록 pg_statio_user_% 카탈로그를 사용했고, slru는 데이터베이스 상관없이 공통으로 볼 수 있습니다.
 
 - 8_sessioncheck.sql
+[source,sql]
+----
+/* session check */
+select
+        pid as process_id,
+        usename as owner,
+        datname as dbname,
+        application_name as application_name,
+        client_addr || ':' || client_port as ip_port_info, --ip와 port정보를 한꺼번에 볼 수 있도록
+        to_char(backend_start, 'YYYY-MM-DD HH24:MI:SS') as session_started_time, 
+        -- 마이크로초까지 나오는 시간을 보기좋게 초까지만 잘라서 문자로 변환
+        to_char(state_change, 'YYYY-MM-DD HH24:MI:SS') as session_changed_time,
+        state as current_status,
+        --substr(query,1,100) as query, 쿼리 내용까지 보기엔 길어서 주석처리, 다만 query id는 추가해야함
+        wait_event_type as wait_type, -- wait_event_type에 유형이 있음. 별도 정리
+        wait_event as wait, -- wait_event에도 유형이 있음. 별도 정리
+        backend_type --backend_type에도 유형이 있음. 별도 정리
+from
+        pg_stat_activity;
+
+----
+
+pg_stat_activity를 이용해 현재 세션에 관련된 정보를 볼 수 있습니다. query id만 볼 수 있도록 수정할 예정이며, wait_event_type, wait_event, backend_type에서 나타나는 유형은 별도로 정리합니다.
+
 
 - 8_transactionchk.sql
+[source,sql]
+----
+/*transaction check*/
+select
+        pid as process_id,
+        usename as owner,
+        datname as dbname,
+        to_char(xact_start, 'YYYY-MM-DD HH24:MI:SS') as tx_started_time,
+        to_char(state_change, 'YYYY-MM-DD HH24:MI:SS') as tx_changed_time,
+        state as current_status,
+        wait_event_type as waiting_type,
+        wait_event as wait_event,
+        substr(query,1,100) as query
+from
+        pg_stat_activity
+where
+        xact_start is not null;
+----
+마찬가지로 pg_stat_activity를 이용해 현재 트랜젝션 관련된 정보를 볼 수 있습니다. 마찬가지로 query id만 볼 수 있도록 수정할 예정이며, 항목이 한눈에 들어오기 힘들 수 있어서 여러번 나누어서 보여주도록 수정하는 것도 괜찮을 것 같습니다.
 
 - 9_sqlplan.sql
 
+explain verbose가 가능한 쿼리만 뽑아내서 query plan을 직접 실행할 수 있도록 별도 sql 파일 생성해서 실행하도록 하려 했으나, select 이외 구문을 실행할 경우 위험하기 때문에 우선 이 과정을 삭제하고 공백으로 놔뒀습니다. 이쪽에는 plan 정보를 볼 수 있는 시스템 카탈로그를 찾아서 그 정보를 쿼리로 볼 수 있도록 수정할 예정입니다.
+
+
 - 9_topsqlchk.sql
+[source,sql]
+----
+/* total top 10 query */
+
+select
+        a.userid,
+        b.usename,
+        a.dbid,
+        c.datname,
+        a.queryid,
+        substr(a.query, 1, 100) as query, -- substr - 문자열 자르는 함수
+        a.calls, -- statement가 콜된 횟수
+        a.total_exec_time,
+        a.min_exec_time,
+        a.max_exec_time,
+        a.rows
+from
+        public.pg_stat_statements a
+join pg_catalog.pg_user b on a.userid = b.usesysid
+join pg_catalog.pg_stat_database c on a.dbid = c.datid
+where
+        c.datname = :v1
+order by a.max_exec_time desc
+limit 10;
+----
+
+이부분도 query를 직접 보여주는 부분은 자르고 query id만 표시되게끔 수정할 예정이며 min_exec_time과 max_exec_time을 이용해 평균 실행시간을 추가하면서 또 필요한 부분도 추가하여 보기 좋게 쿼리 결과를 나눠서 보여주도록 할 예정입니다. pg_stat_statements는 쿼리 및 실행시간, 콜 된 횟수등 자세한 내용이 담긴 extension으로, 이 extension은 추후 기술지원 시에 필요할 것이라 생각합니다. pg_stat_statements는 과거부터 현재까지 실행된 쿼리 정보를 담고있어서 예전에 오래 실행되었던 쿼리도 찾을 수 있는데, 이와 별도로 pg_stat_activity와 연계해서 현재 상태의 top 10 query도 추가로 뽑아 낼 수 있을 지 고민하고 있습니다.
 
 - 10_tableusage.sql
+[source,sql]
+----
+SELECT
+       relname AS "table_name",
+       pg_size_pretty(pg_table_size(C.oid)) AS "table_size"
+FROM
+       pg_class C
+LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
+WHERE
+        nspname NOT IN ('pg_catalog', 'information_schema') AND nspname !~ '^pg_toast' AND relkind IN ('r')
+ORDER BY pg_table_size(C.oid)
+DESC;
+----
+
+시스템 카탈로그 담고있는 스키마 제외 단순 테이블 사이즈만 보여주는 쿼리 입니다.
 
 - 10_tuplestate.sql
+[source,sql]
+----
+SELECT
+        c.relname AS table_name,
+        pg_stat_get_live_tuples(c.oid) + pg_stat_get_dead_tuples(c.oid) as total_tuple,
+        pg_stat_get_live_tuples(c.oid) AS live_tuple,
+        pg_stat_get_dead_tuples(c.oid) AS dead_tupple,
+        CASE WHEN pg_stat_get_live_tuples(c.oid) = 0 and pg_stat_get_dead_tuples(c.oid)=0 then 0
+        ELSE round(100*pg_stat_get_live_tuples(c.oid) / (pg_stat_get_live_tuples(c.oid) + pg_stat_get_dead_tuples(c.oid)),2)
+        END ||'%' as live_tuple_rate
+/*      CASE WHEN pg_stat_get_live_tuples(c.oid) = 0 and pg_stat_get_dead_tuples(c.oid)=0 then 0
+        ELSE round(100*pg_stat_get_dead_tuples(c.oid) / (pg_stat_get_live_tuples(c.oid) + pg_stat_get_dead_tuples(c.oid)),2)
+        END ||'%' as dead_tuple_rate*/
+FROM
+        pg_class AS c, pg_stat_user_tables AS u, pg_namespace AS n
+WHERE
+        n.oid = c.relnamespace AND c.relname = u.relname
+ORDER BY dead_tupple DESC;
+----
+pg_stat_get_live_tuples 함수와 pg_stat_get_dead_tuples 함수를 이용해 총 tuple수와 live tuple과 dead tuple 갯수를 볼 수 있고, 이를 이용해 live tuple의 비율도 계산 해서 볼 수 있습니다. dead tuple은 live tuple 비율만 계산되면 저절로 알 수 있기에 주석처리 했습니다.
 
 - 10_vacuumcheck.sql
+[source,sql]
+----
+/* vacuum used - vacuum verbose 'tablename'*/
+select
+        relname,
+        last_vacuum, -- 마지막 vacuum이 돌았던 시간
+        last_autovacuum, -- 마지막 autovacuum이 돌았던 시간
+        vacuum_count, -- vacuum이 돈 횟수
+        autovacuum_count -- autovacuum이 돈 횟수
+from
+        pg_stat_user_tables
+order by last_vacuum, last_autovacuum;
+
+
+/* vacuum analyze command used - vacuum analyze 'tablename'*/
+select
+        relname,
+        last_analyze, -- 마지막 analyze가 돌았던 시간
+        last_autoanalyze, -- 마지막 autoanalyze가 돌았던 시간
+        analyze_count, -- analyze가 돈 횟수
+        autoanalyze_count -- autoanalyze가 돈 횟수
+from
+        pg_stat_user_tables
+order by last_analyze, last_autoanalyze;
+----
+
+pg_stat_user_tables(전체는 pg_stat_all_tables) 컬럼에는ㄴ vacuum과 analyze를 각각 볼 수 있기에 이를 vacuum 따로 analyze 따로 볼 수 있도록 나눠놨습니다.
 
 - 10_vacuumstate.sql
+[source,sql]
+----
+select
+        *
+from
+        pg_stat_progress_vacuum;
+----
+
+실시간으로 vacuum이 돌 때 상태를 볼 수 있는 sql입니다. pg_stat_progress_vacuum의 컬럼 내용도 많지 않고 모두 볼만한 내용이라 생각하여 *로 처리했습니다.
 
 - 12_check_lock.sql
+[source,sql]
+----
+SELECT
+        t.relname,
+        l.locktype, -- lock 개체 유형, 별도 정리
+        page,
+        virtualtransaction, -- lock을 보유하거나 대기 중인 트랜잭션의 가상 ID
+        pid, -- 이 lock을 보유하거나 기다리는 서버 프로세스의 id
+        mode, -- 이 프로세스에서 보유하거나 원하는 lock 유형
+        granted
+FROM
+        pg_locks l, pg_stat_all_tables t
+WHERE
+        l.relation = t.relid
+ORDER BY relation ASC;
+
+
+/* lock query modified*/
+
+SELECT
+        blocked_locks.pid     AS blocked_pid,
+        blocked_activity.usename  AS blocked_user,
+        blocking_locks.pid     AS blocking_pid,
+        blocking_activity.usename AS blocking_user,
+        blocked_activity.query    AS blocked_statement,
+        blocking_activity.query   AS current_statement_in_blocking_process
+FROM
+        pg_catalog.pg_locks         blocked_locks
+JOIN pg_catalog.pg_stat_activity blocked_activity  ON blocked_activity.pid = blocked_locks.pid
+JOIN pg_catalog.pg_locks         blocking_locks
+        ON blocking_locks.locktype = blocked_locks.locktype
+        AND blocking_locks.database IS NOT DISTINCT FROM blocked_locks.database
+        AND blocking_locks.relation IS NOT DISTINCT FROM blocked_locks.relation
+        AND blocking_locks.page IS NOT DISTINCT FROM blocked_locks.page
+        AND blocking_locks.tuple IS NOT DISTINCT FROM blocked_locks.tuple
+        AND blocking_locks.virtualxid IS NOT DISTINCT FROM blocked_locks.virtualxid
+        AND blocking_locks.transactionid IS NOT DISTINCT FROM blocked_locks.transactionid
+        AND blocking_locks.classid IS NOT DISTINCT FROM blocked_locks.classid
+        AND blocking_locks.objid IS NOT DISTINCT FROM blocked_locks.objid
+        AND blocking_locks.objsubid IS NOT DISTINCT FROM blocked_locks.objsubid
+        AND blocking_locks.pid != blocked_locks.pid
+
+JOIN pg_catalog.pg_stat_activity blocking_activity ON blocking_activity.pid = blocking_locks.pid
+WHERE NOT blocked_locks.granted;
+----
+첫번째 쿼리는 pg_locks와 pg_stat_all_tables를 이용해 모든 락을 볼 수 있도록 정리한 쿼리입니다. 더 필요한 내용이 있으면 pg_locks 테이블 참조하여 추가했으면 합니다.
+
+두번째 쿼리는 실제 락이 발생했을 경우 lock 현황을 볼 수 있는 쿼리입니다. 커뮤니티에서 정리된 쿼리를 가져왔는데, IS NOT DISTINCT FROM을 이용해 pg_locks와 pg_stat_activity를 이용해 bloking, blocked를 구분해서 보여줍니다. row-level locks 만 찾을 수 있는 쿼리라고 합니다. lock 부분도 스터디를 통해 내용 보완이 필요합니다. +
+출처 - https://wiki.postgresql.org/wiki/Lock_Monitoring
+
+
+
+== 4. WAIT_EVENT_TYPE, WAIT_EVENT, BACKEND_TYPE 유형 정리
+
+== 5. pg_locks에서의 locktype과 mode 유형 정리
