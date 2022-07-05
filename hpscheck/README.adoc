@@ -796,12 +796,13 @@ WHERE NOT blocked_locks.granted;
 == 4. WAIT_EVENT_TYPE, WAIT_EVENT, BACKEND_TYPE 유형 정리
 
 * WAIT_EVENT_TYPE 유형 정리
-[width="80%",cols="^2,10",options="header"]
+[width="80%",cols="^2,10,5",options="header"]
 |===
-|WAIT EVENT TYPE |Descryption
+|WAIT EVENT TYPE |Descryption | WAIT EVENT
 
 |Activity 
 |서버 프로세스가 유휴 상태. 이 유형은 main processing loop에서 activity를 기다리는 프로세스
+|ArchiverMain, AutoVacuumMain, BgWriterHibernate, BgWriterMain, CheckpointerMain, LogicalApplyMain, LogicalLauncherMain, PgStatMain, RecoveryWalStreawm, SysLoggerMain, WalReceiverMain, WalSenderMain, WalWriterMain
 
 |BufferPin
 |서버 프로세스가 데이터 버퍼에 대한 단독 액세스를 기다리는 상태. 다른 프로세스가 문제의 버퍼에서 마지막으로 데이터를 읽은 open 커서를 보유하는 경우 버퍼 핀 대기가 길어질 수 있음
@@ -829,6 +830,23 @@ WHERE NOT blocked_locks.granted;
 
 
 |===
+
+* WAIT_EVENT 유형 정리
+
+* BACKEND_TYPE 유형 정리
+- autovacuum launcher
+- autovacuum worker
+- logical replication launcher
+- logical replication worker
+- parallel worker
+- background writer
+- client backend
+- checkpointer
+- archiver
+- startup
+- walreceiver
+- walsender
+- walwriter
 
 
 == 5. pg_locks에서의 locktype과 mode 유형 정리
