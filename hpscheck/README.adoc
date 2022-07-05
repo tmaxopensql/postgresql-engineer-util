@@ -105,6 +105,14 @@ input number :
 
 전부 입력하게 되면 현재 DB, 소유자, 파일 write mode 여부와 함께 점검 항목을 보여줍니다.
 
+그리고 DB명, 소유자명, 패스워드를 체크하는 것은 전부 기본 DB와 소유자인 postgres 를 통해 진행하며, postgres는 쉘 스크립트에 하드코딩 되어있습니다. 만약 postgres 소유자의 패스워드가 다르게 설정되어있다면, hpscheck.sh 쉘 내부에서 패스워드 설정 해준 뒤 실행해야합니다.
+[source,sh]
+----
+defdb="postgres"
+defown="postgres"
+defpwd="postgres" <- 수정 필요
+----
+
 === 2.2. Version Check
 
 0_version.sql 구문을 실행하는 부분이며 현재 PostgreSQL의 버전을 보여주는 항목입니다. 파일을 쓰게 되면 0_version.txt 파일명으로 남기게 됩니다.
@@ -177,30 +185,328 @@ ps -ef |grep postgres | awk '$1 ~ /^postgres$/ {print}' | grep -v  grep | grep -
 == 3. sql 폴더 내 각 sql 파일 내부 설명
 
 - dbcheck.sql
+[source,sql]
+----
+select
+        coalesce(max(datname),'0')
+from
+        pg_stat_database
+where
+        datname = :v1;
+----
+
+:v1 부분에서 쉘에서 입력받은 database 명이 들어가게되며, coalesce 함수와 max 함수가 사용됩니다. colaesce 함수를 사용하는 이유는, 쿼리 결과값이 null이 나오게되면 null값 대신 0으로 값을 대체해, 이를 쉘스크립트에 전달하여 database 명이 존재하는지 안하는지 로직에 반영하게 됩니다. max를 사용한 이유는, max를 사용하지 않을 경우 null일 때 0 값이 출력되지 않아 구글링을 통해 max를 같이 사용해야한다는 커뮤니티의 글을 보고 반영했습니다.
 
 - usercheck.sql
+[source,sql]
+----
+select
+        coalesce(max(usename),'0')
+from
+        pg_shadow
+where
+        usename = :v1;
+----
+
+pg_shadow 뷰를 이용하여 :v1 부분에서 쉘에서 입력받은 소유자 명이 들어가게 되며, coalesce 함수와 max 함수가 사용됩니다.
 
 - 0_version.sql
+[source,sql]
+----
+select version();
+----
+
+단순 버전을 확인 할 수 있는 쿼리입니다.
 
 - 1_dblist.sql
+[source,sql]
+----
+select
+        s.usename as owner,
+        d.datname as database_name,
+        pg_encoding_to_char(d.encoding) as encoding, --encoding id값을 char로 변환
+        d.datcollate as colate,
+        d.datctype as ctype,
+        d.datacl as acl_auth --접근 권한 
+from
+        pg_database d, pg_shadow s
+where
+        s.usesysid = d.datdba;
+
+
+select
+        usename as owner_list
+from
+        pg_shadow;
+
+----
+
+현재 존재하는 데이터베이스와 소유주들을 모두 볼 수 있고, 각 encoding 값과 접근 권한까지 볼 수 있는 쿼리 입니다.
 
 - 2_archchk.sql
+[source,sql]
+----
+select
+        name,
+        setting,
+        category
+from
+        pg_settings
+where
+        name like 'archive%';
+----
+
+where 조건에 archive를 따로 명시해 해당 값만 볼 수 있습니다. pg_settings 테이블의 다른 컬럼 내용중, min max 설정도 같이 볼 수 있는 부분과 다른 컬럼들도 있는데, 엔지니어에 필요한 부분 추가 예정입니다.
 
 - 2_pghbachk.sql
+[source,sql]
+----
+select
+        type,
+        database,
+        user_name,
+        address,
+        auth_method
+from
+        pg_hba_file_rules;
+----
+
+pg_hba.conf 파일 내용이 담겨있는 테이블로 조회한 내용입니다.
+
 
 - 2_vacuumchk.sql
+[source,sql]
+----
+select
+name,
+setting,
+category
+from pg_settings
+where name like '%vacuum%';
+----
+where 조건에 vacuum을 따로 명시해 해당 값만 볼 수 있습니다. pg_settings 테이블의 다른 컬럼 내용중, min max 설정도 같이 볼 수 있는 부분과 다른 컬럼들도 있는데, 엔지니어에 필요한 부분 추가 예정입니다.
+
 
 - 2_walchk.sql
+[source,sql]
+----
+select
+        name,
+        setting,
+        category
+from
+        pg_settings
+where
+        name like '%wal%';
+----
+
+where 조건에 wal를 따로 명시해 해당 값만 볼 수 있습니다. pg_settings 테이블의 다른 컬럼 내용중, min max 설정도 같이 볼 수 있는 부분과 다른 컬럼들도 있는데, 엔지니어에 필요한 부분 추가 예정입니다.
 
 - 3_processmemory.sql
+[source,sql]
+----
+select
+        a.setting as autovacuum_work_mem,
+        c.setting as autovacuum_max_workers,
+        case when cast(a.setting as integer) = -1 then pg_size_pretty(cast(b.setting as bigint)*1024*cast(c.setting as integer))
+             when cast(a.setting as integer) > 0 then pg_size_pretty(cast(a.setting as bigint)*1024*cast(c.setting as integer))
+             when pg_size_pretty(cast(a.setting as bigint)*1024*cast(c.setting as integer)) > pg_size_pretty(1024*1024*1024::bigint) then pg_size_pretty(1024*1024*1024::bigint)
+        end as vaccum_buffer
+from
+        pg_settings a, pg_settings b , pg_settings c
+where
+        a.name = 'autovacuum_work_mem' and b.name = 'maintenance_work_mem' and c.name='autovacuum_max_workers';
+
+show work_mem;
+
+show maintenance_work_mem;
+
+show temp_buffers;
+----
+
+work_mem, maintenance_work_mem, temp_buffers 세팅된 값을 확인할 수 있으며 추가로 vacuum buffer 값 계산을 넣었는데, vacuum buffer는 autovacuum_work_mem, autovacuum_max_workers 부분만 볼 수 있게 하고 계산 값은 커뮤니티에서 토론된 추정부분이라 빼거나, 스터디중 확실시 되면 반영할 계획입니다.
+
+계산 부분은 세팅값이 -1 일때는 maintenance_work_mem 값과 autovacuum_max_workers를 곱한 값을 반영하도록, 0보다 클때는 autovacuum_work_mem 값과 autovacuum_max_workers를 곱한 값을 반영하도록, 그리고 1G를 넘어설 경우에는 1G 까지만 사용한다고 하여 1G를 반영하도록 했습니다.
+
+pg_size_pretty 함수를 사용해 깔끔하게 보이도록 했으며, 1024를 추가로 곱한 이유는 위 setting 값을 pg_size_pretty 적용했을 때 show maintenance_work_mem에서 MB 단위로 나오는것과 다르게 KB로 나와서, 단위가 한단계 낮게 나오는 것을 확인했기 때문입니다.
+
 
 - 3_sharedmemory.sql
+[source,sql]
+----
+show shared_buffers;
+
+show wal_buffers;
+
+/*CLOG buffers not have parameters*/
+select pg_size_pretty(trunc(txid_current()*2/8/8192,0)*8192 + 8192) as clog_buffers; --clog 계산식
+
+show max_locks_per_transaction;
+
+show max_pred_locks_per_transaction;
+----
+shared_buffers, wal_buffers, max_locks_per_transaction, max_pred_locks_per_transaction 세팅 값을 볼 수 있으며, transaction을 이용해 CLOG 값을 추가로 계산하여 쿼리로 볼 수 있게 반영했습니다. CLOG 값은 $PGDATA/pg_xact 경로의 0000 파일 크기와 일맥상통합니다.
 
 - 5_dbsize.sql
+[source,sql]
+----
+select
+        datname as database_name,
+        pg_size_pretty(pg_database_size(:v1)) as database_size
+from
+        pg_database
+where
+        datname = :v1
+;
+
+----
+
+:v1 부분에서 입력받은 database명으로 그 database의 사이즈를 볼 수 있는 쿼리입니다.
 
 - 5_tbixsize.sql
+[source,sql]
+----
+
+--테이블 사이즈 및 상세 relation 사이즈 관련 쿼리
+with
+all_tables as
+(
+SELECT
+        *
+FROM (
+SELECT
+        'all_tables'::text AS table_name,
+        pg_size_pretty(sum(pg_table_size(C.oid))) AS table_size,
+        pg_size_pretty(sum(pg_relation_size(C.oid, 'main'))) AS relation_main_size,
+        pg_size_pretty(sum(pg_relation_size(C.oid, 'fsm'))) AS relation_fsm_size,
+        pg_size_pretty(sum(pg_relation_size(C.oid, 'vm'))) AS relation_vm_size,
+        pg_size_pretty(sum(pg_relation_size(C.oid, 'init'))) AS relation_init_size
+FROM
+        pg_class C, pg_namespace N
+where
+        N.oid = C.relnamespace and nspname NOT IN ('pg_catalog', 'information_schema') AND nspname !~ '^pg_toast' AND relkind IN ('r')
+)a),
+tables as
+(
+SELECT
+        *
+FROM (
+SELECT
+        relname AS table_name,
+        pg_size_pretty(pg_table_size(C.oid)) AS table_size,
+        pg_size_pretty(pg_relation_size(C.oid, 'main')) AS relation_main_size,
+        pg_size_pretty(pg_relation_size(C.oid, 'fsm')) AS relation_fsm_size,
+        pg_size_pretty(pg_relation_size(C.oid, 'vm')) AS relation_vm_size,
+        pg_size_pretty(pg_relation_size(C.oid, 'init')) AS relation_init_size
+FROM
+        pg_class C, pg_namespace N
+where
+        N.oid = C.relnamespace and nspname NOT IN ('pg_catalog', 'information_schema') AND nspname !~ '^pg_toast' AND relkind IN ('r')
+)a)
+SELECT
+        table_name as table_name,
+        table_size as table_size,
+        relation_main_size as relation_main_size,
+        relation_fsm_size as relation_fsm_size,
+        relation_vm_size as relation_vm_size,
+        relation_init_size as relation_init_size
+FROM
+        (SELECT * FROM all_tables UNION ALL SELECT * FROM tables) a;
+
+--테이블의 인덱스 사이즈 관련 쿼리
+with
+all_tables as
+(
+SELECT
+        *
+FROM (
+SELECT
+        'all_tables'::text AS table_name,
+        'all_indexes'::text AS index_name,
+        pg_size_pretty(sum(pg_relation_size(i.indexname::TEXT))) AS index_size
+FROM
+        pg_class C Left OUTER JOIN pg_indexes i on  C.relname = i.tablename,
+        pg_namespace N
+where
+        N.oid = C.relnamespace and nspname NOT IN ('pg_catalog', 'information_schema') AND nspname !~ '^pg_toast' AND relkind IN ('r')
+)a),
+tables as
+(
+SELECT
+        *
+FROM (
+SELECT
+        C.relname AS table_name,
+        i.indexname AS index_name,
+        pg_size_pretty(pg_relation_size(i.indexname::TEXT)) AS index_size
+FROM
+        pg_class C Left OUTER JOIN pg_indexes i on  C.relname = i.tablename,
+        pg_namespace N
+where
+        N.oid = C.relnamespace and nspname NOT IN ('pg_catalog', 'information_schema') AND nspname !~ '^pg_toast' AND relkind IN ('r')
+)a)
+SELECT
+        table_name as table_name,
+        index_name as index_name,
+        index_size as index_size
+FROM
+        (SELECT * FROM all_tables UNION ALL SELECT * FROM tables) a;
+
+--테이블사이즈 + 인덱스사이즈 합친 총 relation 사이즈 볼 수 있는 쿼리
+with
+all_tables as
+(
+SELECT
+        *
+FROM (
+SELECT
+        'all_tables'::text AS table_name,
+        pg_size_pretty(sum(pg_total_relation_size(C.oid))) AS total_relation_size
+FROM
+        pg_class C, pg_namespace N
+where
+        N.oid = C.relnamespace and nspname NOT IN ('pg_catalog', 'information_schema') AND nspname !~ '^pg_toast' AND relkind IN ('r')
+)a),
+tables as
+(
+SELECT
+        *
+FROM (
+SELECT
+        relname AS table_name,
+        pg_size_pretty(pg_total_relation_size(C.oid)) AS total_relation_size
+FROM
+        pg_class C, pg_namespace N
+where
+        N.oid = C.relnamespace and nspname NOT IN ('pg_catalog', 'information_schema') AND nspname !~ '^pg_toast' AND relkind IN ('r')
+)a)
+SELECT
+        table_name as table_name,
+        total_relation_size as total_relation_size
+FROM
+        (SELECT * FROM all_tables UNION ALL SELECT * FROM tables) a;
+
+----
+
+각 쿼리 모두 첫 행에 모든 테이블을 합친 결과값이 먼저 보이게끔 설정했습니다. 테이블 사이즈에서는 각 relation(main, fsm, vm, init) 별로 상세히 볼 수 있기에 이를 적극 반영했습니다. 인덱스 사이즈는 처음에 pg_index_size 함수를 사용했다가, 해당 테이블의 모든 인덱스를 합쳐서 보여주는 것을 확인하고, pg_relation_size 함수로 각 인덱스별 사이즈를 보여주게 끔 수정했습니다. total relation 사이즈도 마지막에 테이블 별 총 사이즈를 확인 할 수 있게 추가했습니다.
 
 - 5_tbssize.sql
+[source,sql]
+----
+select
+        s.usename as owner,
+        t.spcname as tablespace_name,
+        d.datname as database_name,
+        pg_tablespace_location(t.oid) as tablespace_directory,
+        pg_size_pretty(pg_tablespace_size(spcname)) as tablespace_size
+from
+        pg_tablespace t, pg_shadow s, pg_database d
+where
+        t.spcowner = s.usesysid and d.dattablespace = t.oid and s.usename = :v1;
+----
+
+:v1 부분에서 입력받은 소유자 명으로 그 소유자의 tablespace 사이즈를 볼 수 있는 쿼리입니다.
+
 
 - 7_diskio.sql
 
