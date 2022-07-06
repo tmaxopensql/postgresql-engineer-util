@@ -720,7 +720,7 @@ else
         echo -e ""
         read -p "##### Press Enter #####" ynread
         echo -e ""
-
+fi
 ;;
 10)
 	rm ./chkreslt/$dirname/10_vacuumchk.txt
