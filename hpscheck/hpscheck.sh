@@ -675,7 +675,7 @@ else
 fi
 ;;
 9)
-	rm ./chkreslt/$dirname/8_cursessionchk.txt
+	rm ./chkreslt/$dirname/9_topsqlchk.txt
 	
 clear
 
