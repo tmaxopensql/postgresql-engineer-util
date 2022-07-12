@@ -1,3 +1,4 @@
+-- column database_size check -- 
 select 
 	datname as database_name, 
 	pg_size_pretty(pg_database_size(:v1)) as database_size 
