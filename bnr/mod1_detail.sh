@@ -70,21 +70,68 @@ function end_counter(){
 function get_archive(){
   archive_dir=`psql -t -c "SHOW archive_command"`
 
+  archive_dir=${archive_dir//\"/}
+  archive_dir=${archive_dir//cp/}
+  if [[ $archive_dir == *&&* ]]; then
+    archive_dir=${archive_dir/*&&/}
+  fi
+  archive_dir=${archive_dir/\/%f/}
+  archive_dir=${archive_dir/ %p/}
+
   echo "$archive_dir"
 }
 
+
+function walReader(){
+  echo "Start read WAL files from ${3}"
+
+  words=("COMMIT" "CHECKPOINT" "VACUUM" "RESTORE")
+
+  for((i=0; i<=1000; i=i+1)); do
+    nextWalName=$(end_counter ${2} $i)
+    if [[ "$nextWalName" == "${4}" ]]; then
+      break;
+    fi
+    echo "Reading .. ${nextWalName}"
+  #읽어올 WAL 파일명${nextWalName}"
+    grepWord=""
+    for((j=0; j<${#words[@]};j=j+1)); do
+      if [[ ${#words[@]} -eq $((j-1)) ]] || [[ $j -eq 0 ]] ;then
+        grepWord="${grepWord}${words[$j]}"
+      else
+        grepWord="${grepWord}|${words[$j]}"
+      fi
+    done
+    waldump=`pg_waldump ${3}/${nextWalName} 2>>error.log | grep -E "$grepWord" >> wal.txt`
+  done
+
+  echo -e "Finished to read WAL files from ${3}\n"
+}
+
+#####################################################
 #####################################################
 
-arcvDir=$(get_archive)
-arcvDir=${arcvDir//cp/}
-if [[ $arcvDir == *&&* ]]; then
-  arcvDir=${arcvDir/*&&/}
-  arcvDir=${arcvDir/ %p/}
-else
-  arcvDir=${arcvDir/ %p/}
+echo "PITR needs backup"
+echo "Please, Input your backup data directory"
+echo "Ex) /hypersql/bak/2022-12-31/data/"
+
+read bakDir
+if [[ ${#bakDir} -lt 0 ]] || [[ ! -d ${bakDir} ]]; then
+  echo "You inputed wrong directory!!"
+  exit 100
 fi
 
-echo $arcvDir
+bakDir="$bakDir/"
+
+arcvDir=$(get_archive)
+arcvDir=($(echo "$arcvDir" | tr ' ' '\n'))
+
+priorChk=`pg_controldata $bakDir | grep 'WAL file'`
+priorChk=${priorChk/Latest checkpoint\'s REDO WAL file:}
+priorChk=($(echo "$priorChk" | tr ' ' '\n'))
+
+echo "$priorChk"
+
 lastChk=`pg_controldata | grep 'WAL file'`
 lastChk=${lastChk/Latest checkpoint\'s REDO WAL file:}
 lastChk=($(echo "$lastChk" | tr ' ' '\n'))
@@ -107,28 +154,10 @@ fi
 if [[ -f wal.txt ]]; then
   rm wal.txt
 fi
-  echo "Start read WAL files.."
 
-words=("COMMIT" "CHECKPOINT" "VACUUM" "RESTORE")
-
-for((i=0; i<=$walCount; i=i+1)); do
-  nextWalName=$(end_counter ${lastChk} $i)
-  if [[ "$nextWalName" == "000000010000000000000000" ]]; then
-    break;
-  fi 
-  echo "Reading .. ${nextWalName}"
-#읽어올 WAL 파일명${nextWalName}"
-  grepWord=""
-  for((j=0; j<${#words[@]};j=j+1)); do
-    if [[ ${#words[@]} -eq $((j-1)) ]] || [[ $j -eq 0 ]] ;then
-      grepWord="${grepWord}${words[$j]}"
-    else
-      grepWord="${grepWord}|${words[$j]}"
-    fi
-  done
-  waldump=`pg_waldump ${PGDATA}/pg_wal/${nextWalName} 2>>error.log | grep -E "$grepWord" >> wal.txt`
-done
-  echo -e "Finished to read WAL files \n"
+# wal 읽어오기
+walReader ${walCount} ${lastChk} ${PGDATA}/pg_wal ${priorChk}
+walReader ${walCount} ${lastChk} ${arcvDir} ${priorChk}
 
 # Recovery Target 입력받기
 targetType=("lsn" "xid" "time" "timeline" "name")
@@ -146,7 +175,8 @@ fi
 
 # 입력 받은 Recovery Target을 기준으로Recovery가 가능한 시점만 읽어옴
 while read line || [ -n "$line" ]; do
-  echo "$line" | grep ${targetType[$selType]}
+  #echo "$line" | grep ${targetType[$selType]}
+  echo "$line"
 done < wal.txt
 
 
@@ -159,6 +189,6 @@ if [[ ${#targetValue} -lt 0 ]]; then
 fi
 
 #mod2는 postgresql.auto.conf에 해당 recovery 내용을 넣어주는 script 
-./mod2_autoconf.sh restore_command ${arcvDir}
-./mod2_autoconf.sh recovery_target_${targetType[$selType]} ${targetValue}
-./mod2_autoconf.sh recovery_target_action promote
+./mod2_autoconf.sh restore_command "cp ${arcvDir}/%f %p" 1 ${bakDir}
+./mod2_autoconf.sh recovery_target_${targetType[$selType]} ${targetValue} 0 ${bakDir}
+./mod2_autoconf.sh recovery_target_action promote 0 ${bakDir}
