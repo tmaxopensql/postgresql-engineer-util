@@ -32,7 +32,7 @@ function get_DB_info() {
 function calPeriod() {
 # $1 = period
 case $1 in
-	1) echo "* * * * * " ;;
+	1) echo "0 0 * * * " ;;
 	2) echo "* * * * 7 " ;;
 	3) echo "* * 1 * * " ;;
 esac
