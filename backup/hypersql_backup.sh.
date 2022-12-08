@@ -4,10 +4,10 @@ DATETIME=`date +%Y%m%d_%H%M%S`
 
 # LOGGING
 function logging() {
-	if [[ $BAK_LOG_ENABLE =~ [Yy] ]]; then
-		LOGDATE=`date +%Y-%m-%d\ %H:%M:%S`
-		echo -e "[$LOGDATE] $1" >> ${BAK_LOG_DIR}/backup-${DATETIME}.log;
-	fi
+        if [[ $BAK_LOG_ENABLE =~ [Yy] ]]; then
+                LOGDATE=`date +%Y-%m-%d\ %H:%M:%S`
+                echo -e "[$LOGDATE] $1" >> ${BAK_LOG_DIR}/backup-${DATETIME}.log;
+        fi
 }
 
 function get_DB_info() {
@@ -26,90 +26,109 @@ function get_DB_info() {
     done
                 echo "Total Database Size : "$((${sizeSum}/1024/1024))"MB"
                 logging "Total Database Size : "$((${sizeSum}/1024/1024))"MB"
+
+}
+
+# 2022-12-08 
+function tablespace_remapping() {
+        LOCS=`psql --host=${CON_SOCKET_DIR} --port=${CON_PORT} --username=${CON_USER} -x -A -t -c "\db"`
+        echo "$LOCS"
+        logging "Tablespace info :\n$LOCS"
+        LOCS=($(echo "$LOCS" | grep Location | tr ' ' '\n'))
+
+        for((i=0; i<${#LOCS[@]};i++)); do
+                LOCATION="${LOCS[$i]//*|/}"
+
+                if [[ ! ${#LOCATION} -lt 1 ]]; then
+                        echo "$LOCATION REMAPPED TO ${BAK_DIR}/tbs_remap/$LOCATION"
+                        logging "$LOCATION REMAPPED TO ${BAK_DIR}/tbs_remap/$LOCATION"
+                        BAK_OPTS="$BAK_OPTS --tablespace-mapping=$LOCATION=${BAK_DIR}/tbs_remap/$LOCATION"
+                fi
+        done
 }
 
 # CACLUATE PERIOD
 function calPeriod() {
 # $1 = period
 case $1 in
-	1) echo "0 0 * * * " ;;
-	2) echo "* * * * 7 " ;;
-	3) echo "* * 1 * * " ;;
+        1) echo "* * * * * " ;;
+        2) echo "* * * * 7 " ;;
+        3) echo "* * 1 * * " ;;
 esac
 }
 
 # EDIT CRONTABLE & INSTALL
 function editCron() {
-	crontab -l > ${BAK_DIR}/crontmpf
-	sed -i "/hypersql_backup/d" ${BAK_DIR}/crontmpf
-	CRON_CMD=$(calPeriod $1)
-	CRON_CMD="$CRON_CMD $2"
-	echo "$CRON_CMD" >> ${BAK_DIR}/crontmpf
-	crontab -r
-	crontab -i ${BAK_DIR}/crontmpf
-	logging "$CRON_CMD"
-	rm -rf ${BAK_DIR}
+        crontab -l > ${BAK_DIR}/crontmpf
+        sed -i "/hypersql_backup/d" ${BAK_DIR}/crontmpf
+        CRON_CMD=$(calPeriod $1)
+        CRON_CMD="$CRON_CMD $2"
+        echo "$CRON_CMD" >> ${BAK_DIR}/crontmpf
+        crontab -r
+        crontab -i ${BAK_DIR}/crontmpf
+        logging "$CRON_CMD"
+        rm -rf ${BAK_DIR}
 
 }
 
 # ECHO USAGE
 if [ $# -lt 1 ] || [ $# -gt 2 ]; then
-	echo "Usage: $0 <CONFIG FILE> [OPTION]"
-	exit 1
+        echo "Usage: $0 <CONFIG FILE> [OPTION]"
+        exit 1
 fi
 
 CONFIG_PATH="$1"
 SHELL_PATH="$0"
 # GET CONFIGURATION
 if [[ -e ${1} ]] && [[ -s ${1} ]] ; then
-	if [[ ${1:0:1} == . ]] && [[ ! ${1:0:1} == / ]]; then
-		CRD=`pwd`
-		. $CRD/${1}
-		CONFIG_PATH="$CRD/${1}"
-	elif [[ ! ${1} == */* ]]; then
-		. ./${1}
-		CRD=`pwd`
-		CONFIG_PATH="$CRD/${1}"
-	else
-		. ${1}
-	fi
+        if [[ ${1:0:1} == . ]] && [[ ! ${1:0:1} == / ]]; then
+                CRD=`pwd`
+                . $CRD/${1}
+                CONFIG_PATH="$CRD/${1}"
+        elif [[ ! ${1} == */* ]]; then
+                . ./${1}
+                CRD=`pwd`
+                CONFIG_PATH="$CRD/${1}"
+        else
+                . ${1}
+        fi
 else
-	echo "[ERR:00] : Configuration file does not exist."	
-	exit 1
+        echo "[ERR:00] : Configuration file does not exist."
+        exit 1
 fi
 
 if [[ $# = 2 ]]; then
-	case $2 in
-		--immediately)
-			BAK_PERIOD=0 ;;
-		--getinfo)
-			get_DB_info
-			exit 0 ;;
-	esac
+        case $2 in
+                --immediately)
+                        BAK_PERIOD=0 ;;
+                --getinfo)
+                        get_DB_info
+                        exit 0 ;;
+        esac
 fi
 
 
 
 # GET SHELL LOCATION
 if [[ ! ${0:0:1} == . ]]; then
-	SHELL_PATH=$0
+        SHELL_PATH=$0
 elif [[ ! ${0} == */* ]]; then
-	SHELL_PATH=$CRD/${0:1}
+        SHELL_PATH=$CRD/${0:1}
 else
-	SHELL_PATH=$CRD/${0:1}
+        SHELL_PATH=$CRD/${0:1}
 fi
 
 # SET LOG
 if [[ ${BAK_LOG_ENABLE} =~ [Yy] ]] ; then
-	touch ${BAK_LOG_DIR}/checkfile
-	if [[ ! -d ${BAK_LOG_DIR} ]] || [[ ! -w ${BAK_LOG_DIR}/checkfile ]]; then
-		echo "Please Check Log directory... Ex) Permission"
-		exit 1
-	else
-		rm -f ${BAK_LOG_DIR}/checkfile
-		echo "${BAK_LOG_DIR}/backup-${DATETIME}.log"
-		BAK_OPTS="$BAK_OPTS --verbose "
-	fi
+        touch ${BAK_LOG_DIR}/checkfile
+        if [[ ! -d ${BAK_LOG_DIR} ]] || [[ ! -w ${BAK_LOG_DIR}/checkfile ]]; then
+                echo "Please Check Log directory... Ex) Permission"
+                exit 1
+        else
+                rm -f ${BAK_LOG_DIR}/checkfile
+                echo "${BAK_LOG_DIR}/backup-${DATETIME}.log"
+                BAK_OPTS="$BAK_OPTS --verbose "
+        fi
 fi
 
 logging "Start logging..."
@@ -121,23 +140,25 @@ if [[ ! -d ${BAK_DIR} ]] || [[ ! -w ${BAK_DIR}/checkfile ]]; then
                 logging "Please Check Backup directory... Ex) Permission"
                 exit 1
 else
-		rm -f ${BAK_DIR}/checkfile
-		BAK_DIR=${BAK_DIR}/backup-${DATETIME}
-		mkdir ${BAK_DIR}
-		BAK_OPTS="${BAK_OPTS} -D ${BAK_DIR}" 
+                rm -f ${BAK_DIR}/checkfile
+                BAK_DIR=${BAK_DIR}/backup-${DATETIME}
+                mkdir ${BAK_DIR}
+                BAK_OPTS="${BAK_OPTS} -D ${BAK_DIR}"
 fi
 
 # SET PERIOD
 if [[ ! $BAK_PERIOD =~ ^[0-3] ]] || [[ ${#BAK_PERIOD} -gt 1 ]]; then
-	echo "[ERR:02] : Please, Input valid period in configuration file"
-	logging "[ERR:02] : Please, Input valid period in configuration file"
-	exit 1
+        echo "[ERR:02] : Please, Input valid period in configuration file"
+        logging "[ERR:02] : Please, Input valid period in configuration file"
+        exit 1
 fi
 
 
 # SET COMPRESS
 if [[ ${#BAK_COMPRESS_LEVEL} -gt 0 ]] && [[ ${BAK_COMPRESS_ENABLE} == Y ]] || [[ ${BAK_COMPRESS_ENABLE} == y ]]; then
-	BAK_OPTS="$BAK_OPTS -Ft --compress=$BAK_COMPRESS_LEVEL "
+        BAK_OPTS="$BAK_OPTS -Ft --compress=$BAK_COMPRESS_LEVEL "
+else
+        tablespace_remapping
 fi
 
 # SET CHECKPOINT
@@ -147,7 +168,7 @@ fi
 
 # SET SYNC
 if [[ ${BAK_ASYNC} =~ [yY] ]] ; then
-	BAK_OPTS="$BAK_OPTS --no-sync "
+        BAK_OPTS="$BAK_OPTS --no-sync "
 fi
 
 
@@ -164,11 +185,11 @@ echo "$BAK_OPTS"
 get_DB_info
 
 case $BAK_PERIOD in
-	0) pg_basebackup ${BAK_OPTS} >> ${BAK_LOG_DIR}/backup-${DATETIME}.log 2>&1
-		echo "backup complete.." 
-		logging "backup complete.." ;;
-	*) editCron $BAK_PERIOD "$SHELL_PATH $CONFIG_PATH --immediately" 
-		echo "backup reserverd.."
-		logging "backup reserverd.." ;;
+        0) pg_basebackup ${BAK_OPTS} >> ${BAK_LOG_DIR}/backup-${DATETIME}.log 2>&1
+                echo "backup complete.."
+                logging "backup complete.." ;;
+        *) editCron $BAK_PERIOD "$SHELL_PATH $CONFIG_PATH --immediately"
+                echo "backup reserverd.."
+                logging "backup reserverd.." ;;
 esac
 
