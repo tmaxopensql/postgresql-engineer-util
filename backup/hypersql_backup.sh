@@ -51,9 +51,9 @@ function tablespace_remapping() {
 function calPeriod() {
 # $1 = period
 case $1 in
-        1) echo "* * * * * " ;;
-        2) echo "* * * * 7 " ;;
-        3) echo "* * 1 * * " ;;
+        1) echo "0 0 * * * " ;;
+        2) echo "0 0 * * 7 " ;;
+        3) echo "0 0 1 * * " ;;
 esac
 }
 
