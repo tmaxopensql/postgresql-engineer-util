@@ -50,7 +50,6 @@ logging "Exec tablespace_remapping()..."
 
 # CACLUATE PERIOD
 function calPeriod() {
-logging "Exec calPeriod()..."
 # $1 = period
 case $1 in
         1) echo "0 0 * * * " ;;
@@ -63,15 +62,14 @@ esac
 function editCron() {
 logging "Exec editCron()..."
         crontab -l > ${BAK_DIR}/crontmpf
-        sed -i "/hypersql_backup/d" ${BAK_DIR}/crontmpf
+logging "Exec calPeriod()..."
         CRON_CMD=$(calPeriod $1)
         CRON_CMD="$CRON_CMD $2"
         echo "$CRON_CMD" >> ${BAK_DIR}/crontmpf
         crontab -r
         crontab -i ${BAK_DIR}/crontmpf
         logging "$CRON_CMD"
-        rm -rf ${BAK_DIR}
-
+        rm ${BAK_DIR}/crontmpf
 }
 
 # 2023-03-01
