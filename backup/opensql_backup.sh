@@ -65,11 +65,12 @@ logging "Exec editCron()..."
 logging "Exec calPeriod()..."
         CRON_CMD=$(calPeriod $1)
         CRON_CMD="$CRON_CMD $2"
+	sed -i "/opensql_backup/d" ${BAK_DIR}/crontmpf
         echo "$CRON_CMD" >> ${BAK_DIR}/crontmpf
         crontab -r
         crontab -i ${BAK_DIR}/crontmpf
         logging "$CRON_CMD"
-        rm ${BAK_DIR}/crontmpf
+        rm -rf ${BAK_DIR}
 }
 
 # 2023-03-01

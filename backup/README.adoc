@@ -1,0 +1,163 @@
+= OpenSQL for PostgreSQL BackupScript
+:toc:
+:toc-title: 목차
+:sectnums:
+
+
+== 개요
+OpenSQL for PostgreSQL 온라인 백업 쉘스크립트 입니다. + 
+백업 방법으로 pg_basebackup을 사용합니다. + 
+풀 백업만 지원 되며, 스케쥴링을 위해 OS의 Crontab을 사용합니다.
+
+== 설치 요구 사항
+지원 되는 PostgreSQL 버전은 아래와 같으며, 동작시에 아래의 패키지가 필요합니다.
+
+|===
+|PostgreSQL 지원 버전|14.X
+|필요 패키지|postgresql14-libs, postgresql14, crontabs, gzip
+|===
+
+백업 수행 OS User의 Crontab 사용 권한이 필요합니다. + 
+커넥션 확인 및 백업을 위해 Database 슈퍼유저 사용을 권고합니다. + 
+백업 스크립트가 수행되는 서버의 정보를 pg_hba.conf에 등록해야 합니다. + 
+현재 pgpool 연결(pgpool port)을 통한 백업은 지원되지 않습니다.
+
+== 사용 방법
+1. opensql.config 파일에서 환경에 맞게 설정을 변경합니다.
+2. opensql_backup.sh 파일을 실행합니다. + 
+`Usage : opensql_backup.sh <CONFIG FILE> [OPTION]`
+
+== COMMAND
+사용할 수 있는 OPTION은 다음과 같습니다.
+
+[options=header]
+|===
+|옵션명|설명
+|--immediately|즉시 백업을 1회 수행합니다.
+|--getinfo|백업 대상 정보만 수집 및 출력하고 백업은 수행하지 않습니다.
+|===
+
+== CONFIGURATION
+opensql.config 파일에 대한 설명입니다. + 
+*Usage* + 
+`Parameter=Value`
+
+=== Connection Settings
+백업 대상 PostgreSQL 서버 연결 정보를 설정합니다.
+
+* CON_TYPE
+** 대상의 구성 방식을 포함한 연결 정보를 설정합니다.
+** 아래의 타입들을 지원합니다.
+
+[options=header]
+|===
+|타입|설명
+|L|대상이 싱글 구성일 경우에 사용하는 타입 입니다. 
+로컬에 설치된 PostgreSQL을 백업할 경우에도 사용합니다.
+
+|P|대상이 Streaming Replication일 경우에 사용하는 타입 입니다.
+Primary node에서 백업을 수행 받도록 지정합니다.
+
+|S|대상이 Streaming Replication일 경우에 사용하는 타입 입니다.
+Standby node에서 백업을 수행 받도록 지정합니다.
+|===
+
+* CON_HOST
+** 접속 대상의 호스트를 지정합니다.
+** Streaming Replication 구성 시 (host1 host2) 형태로 작성해야 합니다.
+*** Primary Node와 Standby Node의 순서는 영향을 미치지 않습니다.
+*** 예시 : CON_HOST=(192.168.184.191 192.168.184.192)
+
+* CON_USER
+** pg_basebackup 및 커넥션 확인에 사용할 유저입니다.
+** 슈퍼유저 사용을 권고합니다.
+
+* CON_PORT
+** 데이터베이스 연결에 사용할 포트를 지정합니다.
+** pgpool 사용 시에도 pgpool 포트가 아닌, Database 포트를 사용해야 합니다.
+
+* CON_RETRY_COUNT
+** 데이터베이스 연결을 확인할 최대 횟수를 지정합니다.
+** 0 또는 1로 설정 시 1번만 체크하게 됩니다.
+
+* CON_RETRY_TIME
+** 데이터베이스 연결 확인 주기를 설정합니다.
+** 단위는 초(Second)입니다.
+** 이 주기에 맞추어서 CON_RETRY_COUNT 횟수 만큼 연결을 확인합니다.
+
+=== Backup Directory Settings
+백업을 저장할 디렉토리를 설정합니다. + 
+
+* BAK_DIR
+** BACKUP 디렉토리를 설정합니다.
+** 백업 스크립트 실행 유저의 읽기 쓰기 실행 권한이 모두 필요합니다.
+** 백업 파일은 `BAK_DIR` 에 수행 시작 시점을 기준으로 `backup-YYYYMMDD_HHMMSS` 디렉토리가 생성되며, 그 안에 위치하게 됩니다.
+
+=== Log Directory & Settings
+로그 사용 유무와 로그를 저장할 디렉토리를 설정합니다. + 
+
+* BAK_LOG_ENABLE
+** Y로 설정 시 로그를 파일로 저장할 수 있습니다.
+** pg_basebackup의 --verbose 옵션이 사용됩니다.
+
+* BAK_LOG_DIR
+** 로그 파일을 저장할 위치입니다.
+** 백업 스크립트 실행 유저의 읽기 쓰기 실행 권한이 모두 필요합니다.
+
+=== Backup Scheduling
+백업 수행 주기를 설정합니다. + 
+OS의 Crontab을 사용합니다.
+
+* BAK_PERIOD
+** 백업 수행 주기를 설정합니다.
+** 설정 가능한 주기는 아래와 같습니다.
+
+[options=header]
+|===
+|주기|설명
+|0| 1회만 즉시 수행합니다.
+|1| 매일 오전 12시 0분에 백업을 수행합니다.
+|2| 매 주 일요일 오전 12시 0분에 백업을 수행합니다.
+|3| 매 달 1일 오전 12시 0분에 백업을 수행합니다.
+|===
+
+
+=== Compression Settings
+백업 파일을 압축할 수 있습니다. + 
+gzip을 사용하여 압축합니다.
+
+* BAK_COMPRESS_ENABLE
+** Y로 설정 시 백업 파일을 gzip으로 압축합니다.
+
+* BAK_COMPRESS_LEVEL
+** gzip의 압축 레벨을 설정합니다.
+** 레벨은 0부터 9까지 있으며 숫자가 클 수록 압축률이 높습니다.
+** gzip의 기본 압축 레벨은 6입니다.
+
+=== Performance Settings
+백업 수행 시 속도에 영향을 미치는 설정 입니다. + 
+
+* BAK_CHECKPOINT_FAST
+** Y 설정 시 백업 수행 요청과 함께 데이터베이스에 체크포인트를 즉시 요청합니다.
+** N 설정 시 데이터베이스의 체크포인트 수행 주기를 기다립니다.
+** 체크포인트의 부하가 운영중인 데이터베이스에 영향을 미칠 수 있으므로 신중하게 사용해야 합니다.
+
+* BAK_ASYNC
+** Y 설정 시 백업을 비동기식으로 진행하게 됩니다.
+** N 설정 시 백업을 동기식으로 진행하게 됩니다.
+** 비동기식은 빠르지만 백업의 정상 수행을 확인하지 않기 때문에 데이터 손실이 발생할 수 있습니다.
+
+* MAX_RATE
+** 백업 수행 속도를 제한할 수 있습니다.
+** 단위는 KB=k, MB=M으로 사용합니다.
+*** 예시 32k 500M
+** 사용하지 않으려면 config 파일의 MAX_RATE를 주석처리 합니다.
+
+== 주의사항
+
+=== 백업 파일 권한 관리
+백업 파일은 기본적으로 OS 유저의 Umask를 가지게 됩니다. + 
+백업 파일을 이용하여 복원 시 권한을 0700 또는 0750으로 변경해야 합니다.
+
+=== 테이블스페이스 사용
+데이터베이스에 존재하는 모든 테이블스페이스는 백업 디렉토리에 재구성 됩니다.
