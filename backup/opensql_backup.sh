@@ -31,18 +31,21 @@ logging "Exec get_DB_info()..."
 # 2022-12-08 
 function tablespace_remapping() {
 logging "Exec tablespace_remapping()..."
-        LOCS=`psql -q --host=${CON_HOST} --port=${CON_PORT} --username=${CON_USER} -x -A -t -c "\db"`
-        logging "Tablespace info :\n$LOCS"
+        LOCS=`psql -q --host=${CON_HOST} --port=${CON_PORT} --username=${CON_USER} -x -A -t -c "\db+"`
+        logging "Tablespace info :"
+	echo -e "Tablespace info :\n" >> ${BAK_LOG_DIR}/tbs_remap_info
+	`psql -q --host=${CON_HOST} --port=${CON_PORT} --username=${CON_USER} -x -A -t -c "SELECT oid as SymboliclinkName, spcname as TablespaceName FROM pg_catalog.pg_tablespace" >> ${BAK_LOG_DIR}/tbs_remap_info` 
+	logging "\n$LOCS"
 	echo ${BAK_DIR}/tbs_remap/tbs_remap_info
-	echo -e "Tablespace info :\n$LOCS" >> ${BAK_LOG_DIR}/tbs_remap_info
+	echo -e "\n$LOCS" >> ${BAK_LOG_DIR}/tbs_remap_info
         LOCS=($(echo "$LOCS" | grep Location | tr ' ' '\n'))
 
         for((i=0; i<${#LOCS[@]};i++)); do
                 LOCATION="${LOCS[$i]//*|/}"
 
                 if [[ ! ${#LOCATION} -lt 1 ]]; then
-                        logging "$LOCATION REMAPPED TO ${BAK_DIR}/tbs_remap/$LOCATION"
-			echo -e "$LOCATION REMAPPED TO ${BAK_DIR}/tbs_remap/$LOCATION" >> ${BAK_LOG_DIR}/tbs_remap_info
+                        #logging "$LOCATION REMAPPED TO ${BAK_DIR}/tbs_remap/$LOCATION"
+			#echo -e "$LOCATION REMAPPED TO ${BAK_DIR}/tbs_remap/$LOCATION" >> ${BAK_LOG_DIR}/tbs_remap_info
                         BAK_OPTS="$BAK_OPTS --tablespace-mapping=$LOCATION=${BAK_DIR}/tbs_remap/$LOCATION"
                 fi
         done
@@ -266,6 +269,7 @@ case $BAK_PERIOD in
                 	logging "BACKUP COMPLETE.." 
 			if [[ -f ${BAK_LOG_DIR}/tbs_remap_info ]]; then	
 				mv ${BAK_LOG_DIR}/tbs_remap_info ${BAK_DIR}/tbs_remap_info
+				rm ${BAK_DIR}/pg_tblspc/*
 			fi
 		else
                 	logging "BACKUP FAILED..\nPLEASE SEE LOGS..." 
