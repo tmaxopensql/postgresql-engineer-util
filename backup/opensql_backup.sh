@@ -28,6 +28,25 @@ logging "Exec get_DB_info()..."
 
 }
 
+function print_Progress() {
+	touch ~/.progress.lock
+	sleep $1
+	while [[ -f ~/.progress.lock ]]; 
+	do
+		PROGRESS=`psql -h ${CON_HOST} -p ${CON_PORT} -U ${CON_USER} -c "SELECT bak_info.total||'MB' as TOTAL_BACKUP_SIZE, bak_info.now||'MB' AS RECEIVED_SIZE, bak_info.tbs_total AS TOTAL_TABLESPACE_COUNT, bak_info.tbs_now AS RECEIVED_TABLESPACE_COUNT, (bak_info.now*100/bak_info.total)||'%' AS PROGRESS FROM (SELECT CASE backup_total WHEN NULL THEN 0 ELSE backup_total/1024/1024 END AS total, CASE backup_streamed WHEN NULL THEN 0 ELSE backup_streamed/1024/1024 END AS now, CASE tablespaces_total WHEN NULL THEN 0 ELSE tablespaces_total END AS tbs_total, CASE tablespaces_streamed WHEN NULL THEN 0 ELSE tablespaces_streamed END AS tbs_now FROM pg_stat_progress_basebackup)as bak_info"`
+		logging "\n$PROGRESS"
+	sleep $1
+	done
+}
+
+function calculate_Time() {
+	elapse_time=`echo "$2-$1" | bc`
+	hour_e=`echo "$elapse_time/3600" | bc`
+	min_e=`echo "$elapse_time/60%60" | bc`
+	sec_e=`echo "$elapse_time%60" | bc`
+	logging "elapsed time for backup = ${hour_e}h : ${min_e}m : ${sec_e}s"
+}
+
 # 2022-12-08 
 function tablespace_remapping() {
 logging "Exec tablespace_remapping()..."
@@ -45,7 +64,6 @@ logging "Exec tablespace_remapping()..."
 
                 if [[ ! ${#LOCATION} -lt 1 ]]; then
                         #logging "$LOCATION REMAPPED TO ${BAK_DIR}/tbs_remap/$LOCATION"
-			#echo -e "$LOCATION REMAPPED TO ${BAK_DIR}/tbs_remap/$LOCATION" >> ${BAK_LOG_DIR}/tbs_remap_info
                         BAK_OPTS="$BAK_OPTS --tablespace-mapping=$LOCATION=${BAK_DIR}/tbs_remap/$LOCATION"
                 fi
         done
@@ -157,6 +175,9 @@ fi
 
 # SET LOG
 if [[ ${BAK_LOG_ENABLE} =~ [Yy] ]] ; then
+	if [ ! -d ${BAK_LOG_DIR} ]; then 
+		mkdir -p ${BAK_LOG_DIR} 
+	fi
         touch ${BAK_LOG_DIR}/checkfile
         if [[ ! -d ${BAK_LOG_DIR} ]] || [[ ! -w ${BAK_LOG_DIR}/checkfile ]]; then
                 echo "Please Check Log directory... Ex) Permission"
@@ -174,6 +195,10 @@ echo -e "Log file : ${BAK_LOG_DIR}/backup-${DATETIME}.log"
 
 # CHECK & SET BAK_DIR
 logging "CHECK & SET BAK_DIR..."
+if [ ! -d ${BAK_DIR} ]; then 
+	mkdir -p ${BAK_DIR} 
+fi
+
 touch ${BAK_DIR}/checkfile
 if [[ ! -d ${BAK_DIR} ]] || [[ ! -w ${BAK_DIR}/checkfile ]]; then
                 logging "[ERR:01] : Please Check Backup directory... Ex) Permission"
@@ -244,6 +269,12 @@ if [[ ${BAK_ASYNC} =~ [yY] ]] ; then
         BAK_OPTS="$BAK_OPTS --no-sync "
 fi
 
+# SET CHECK_PROGRESS_TIME
+if [[ ${BAK_CHECK_PROGRESS_ENABLE} =~ [yY] ]] && [[ ! ${BAK_CHECK_PROGRESS_TIME} =~ ^[1-9]$|^[1-9]{1}[0-9]$ ]]; then
+	logging "[ERR:05] BAK_CHECK_PROGRESS_TIME is not decimal value OR out of range!!"
+	exit 05
+fi
+
 # SET MAX_RATE
 logging "SET MAX_RATE..."
 if [[ ${MAX_RATE} != "" ]] ; then
@@ -264,16 +295,28 @@ logging "START BACKUP..."
 get_DB_info
 
 case $BAK_PERIOD in
-        0) pg_basebackup ${BAK_OPTS} >> ${BAK_LOG_DIR}/backup-${DATETIME}.log 2>&1
+        0) 	start_time=`date +%s`
+		if [[ ${BAK_CHECK_PROGRESS_ENABLE} =~ [yY] ]]; then 
+			logging "SET CHECK_PROGRESS OF BACKUP"
+			print_Progress ${BAK_CHECK_PROGRESS_TIME} &
+		fi
+		pg_basebackup ${BAK_OPTS} >> ${BAK_LOG_DIR}/backup-${DATETIME}.log 2>&1
 		if [[ $? -eq 0 ]]; then
                 	logging "BACKUP COMPLETE.." 
 			if [[ -f ${BAK_LOG_DIR}/tbs_remap_info ]]; then	
 				mv ${BAK_LOG_DIR}/tbs_remap_info ${BAK_DIR}/tbs_remap_info
-				rm ${BAK_DIR}/pg_tblspc/*
+				if [[ -d ${BAK_DIR}/pg_tblspc ]] && [[ ! -e ${BAK_DIR}/pg_tblspc ]]; then
+					rm ${BAK_DIR}/pg_tblspc/*
+				fi
 			fi
 		else
                 	logging "BACKUP FAILED..\nPLEASE SEE LOGS..." 
 		fi
+         	if [[ ${BAK_CHECK_PROGRESS_ENABLE} =~ [yY] ]] && [[ -f ~/.progress.lock ]]; then 
+			rm ~/.progress.lock
+		fi
+		end_time=`date +%s`
+		calculate_Time $start_time $end_time
 		;;
         *) editCron $BAK_PERIOD "$SHELL_PATH $CONFIG_PATH --immediately"
                 logging "BACKUP RESERVED.." ;;
