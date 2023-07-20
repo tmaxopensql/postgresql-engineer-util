@@ -1,1 +1,0 @@
-This directory will be made sub-directory by hpscheck.sh
