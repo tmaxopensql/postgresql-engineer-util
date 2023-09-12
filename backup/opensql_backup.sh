@@ -77,7 +77,7 @@ case $1 in
         1) echo "0 0 * * * " ;;
         2) echo "0 0 * * 7 " ;;
         3) echo "0 0 1 * * " ;;
-	4) echo "${BAK_TIME_MINUTE} ${BAK_TIME_HOUR} ${BAK_DAY_OF_MONTH} * ${BAK_DAY_OF_MONTH}" ;;
+	4) echo "${BAK_TIME_MINUTE} ${BAK_TIME_HOUR} ${BAK_DAY_OF_MONTH} * ${BAK_DAY_OF_WEEK}" ;;
 esac
 }
 
@@ -281,9 +281,6 @@ if [[ ! ${BAK_PERIOD} =~ ^[0-4] ]] || [[ ${#BAK_PERIOD} -gt 1 ]]; then
 	        exit 2
 	fi
 fi
-if [[ ${BAK_PERIOD} -ne 0 ]]; then
-	rm -r ${BAK_DIR}
-fi
 
 
 # SET COMPRESS
@@ -338,31 +335,33 @@ case $BAK_PERIOD in
 			print_Progress ${BAK_CHECK_PROGRESS_TIME} &
 		fi
 		pg_basebackup ${BAK_OPTS} >> ${BAK_LOG_DIR}/backup-${DATETIME}.log 2>&1
-		if [[ $? -eq 0 ]]; then
-                	logging "BASEBACKUP COMPLETE" 
-                	logging "VERIFYING BACKUP.."
-			pg_verifybackup ${BAK_DIR} >> ${BAK_LOG_DIR}/backup-${DATETIME}.log 2>&1
-			VERIFY_SUCCESS=1
-			if [[ $? -eq 0 ]]; then
-                		logging "BACKUP SUCCESSFULLY VERIFIED"
-			else
-                		logging "FAILED TO VERIFY BACKUP!! PLEASE SEE LOGS!!"
-			fi
-			if [[ -f ${BAK_LOG_DIR}/tbs_remap_info ]]; then	
-				mv ${BAK_LOG_DIR}/tbs_remap_info ${BAK_DIR}/tbs_remap_info
-				if [[ -d ${BAK_DIR}/pg_tblspc ]] && [[ ! -e ${BAK_DIR}/pg_tblspc ]]; then
-					rm ${BAK_DIR}/pg_tblspc/*
-				fi
-			fi
-			if [[ ${BAK_REMOVE_ARCHIVE} =~ [yY] ]]; then
-				if [[ $VERIFY_SUCCESS -eq ]]; then
-	                		logging "ARCHIVING FILES WILL BE CLEANED"
-					archive_cleanup
-				else
-					logging "VERIFYING BACKUP FAILED, ARCHIVING FILES WILL NOT BE CLEANED"
-				fi
-			fi
-		else
+                if [[ $? -eq 0 ]]; then
+                        logging "BASEBACKUP COMPLETE"
+                        logging "VERIFYING BACKUP.."
+                        pg_verifybackup ${BAK_DIR} >> ${BAK_LOG_DIR}/backup-${DATETIME}.log 2>&1
+                        VERIFY_SUCCESS=0
+                        if [[ $? -eq 0 ]]; then
+                                logging "BACKUP SUCCESSFULLY VERIFIED"
+                                VERIFY_SUCCESS=1
+                        else
+                                logging "FAILED TO VERIFY BACKUP!! PLEASE SEE LOGS!!"
+                                VERIFY_SUCCESS=0
+                        fi
+                        if [[ -f ${BAK_LOG_DIR}/tbs_remap_info ]]; then
+                                mv ${BAK_LOG_DIR}/tbs_remap_info ${BAK_DIR}/tbs_remap_info
+                                if [[ -d ${BAK_DIR}/pg_tblspc ]] && [[ ! -e ${BAK_DIR}/pg_tblspc ]]; then
+                                        rm ${BAK_DIR}/pg_tblspc/*
+                                fi
+                        fi
+                        if [[ ${BAK_REMOVE_ARCHIVE} =~ [yY] ]]; then
+                                if [[ $VERIFY_SUCCESS -eq 1 ]]; then
+                                        logging "ARCHIVING FILES WILL BE CLEANED"
+                                        archive_cleanup
+                                else
+                                        logging "VERIFYING BACKUP FAILED, ARCHIVING FILES WILL NOT BE CLEANED"
+                                fi
+                        fi
+                else
                 	logging "BACKUP FAILED..\nPLEASE SEE LOGS..." 
 		fi
          	if [[ ${BAK_CHECK_PROGRESS_ENABLE} =~ [yY] ]] && [[ -f ~/.progress.lock ]]; then 
