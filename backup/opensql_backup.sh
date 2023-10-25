@@ -1,5 +1,4 @@
 #!/bin/bash
-PATH=/usr/pgsql-14/bin/:$PATH
 DATETIME=`date +%Y%m%d_%H%M%S`
 CON_CHK_FLAG="t"
 RETRY_ROLE=0
@@ -41,10 +40,10 @@ function print_Progress() {
 }
 
 function calculate_Time() {
-	elapse_time=`echo "$2-$1" | bc`
-	hour_e=`echo "$elapse_time/3600" | bc`
-	min_e=`echo "$elapse_time/60%60" | bc`
-	sec_e=`echo "$elapse_time%60" | bc`
+	elapse_time=`echo $(($2-$1))`
+	hour_e=`echo $((elapse_time/3600))`
+	min_e=`echo $((elapse_time/60%60))`
+	sec_e=`echo $((elapse_time%60))`
 	logging "elapsed time for backup = ${hour_e}h : ${min_e}m : ${sec_e}s"
 }
 
@@ -142,7 +141,7 @@ function checkHostRetry(){
 
 
 function checkBackup() {
-	BACKUP_PROGRESS=`psql -q -h ${CON_HOST} -p ${CON_PORT} -d ${CON_DATABASE} -A -t -c "SELECT * FROM pg_stat_progress_basebackup"`
+	BACKUP_PROGRESS=`psql -q -h ${CON_HOST} -p ${CON_PORT} -d ${CON_DATABASE} -A -t -c "SELECT * FROM pg_stat_progress_basebackup" -U ${CON_USER}`
 	if [[ ${BACKUP_PROGRESS} != "" ]]; then
 		logging "Another backup is in progress..."
 		exit 4
@@ -169,12 +168,15 @@ if [[ -e ${1} ]] && [[ -s ${1} ]] ; then
                 CRD=`pwd`
                 . $CRD/${1}
                 CONFIG_PATH="$CRD/${1}"
+		PATH=/usr/pgsql-${CON_PGVERSION}/bin:$PATH
         elif [[ ! ${1} == */* ]]; then
                 . ./${1}
                 CRD=`pwd`
                 CONFIG_PATH="$CRD/${1}"
+		PATH=/usr/pgsql-${CON_PGVERSION}/bin:$PATH
         else
                 . ${1}
+		PATH=/usr/pgsql-${CON_PGVERSION}/bin:$PATH
         fi
 else
         echo "[ERR:00] : Configuration file does not exist."
@@ -373,3 +375,4 @@ case $BAK_PERIOD in
         *) editCron $BAK_PERIOD "$SHELL_PATH $CONFIG_PATH --immediately"
                 logging "BACKUP RESERVED.." ;;
 esac
+
