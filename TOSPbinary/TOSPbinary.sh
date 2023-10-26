@@ -14,11 +14,11 @@ defdb="postgres"
 defown="postgres"
 defpwd="postgres"
 defport="5432"
-defpghome="/opensql"
-defpgdata="/opensql/pg/14/data"
-defwaldir="/opensql/pg/14/pg_wal"
-deflogdir="/opensql/pg/14/log/pg_log"
-defarchive="/opensql/pg/14/archive"
+defpghome="/var/lib/pgsql/"
+defpgdata="/var/lib/pgsql/15/data"
+defwaldir="/var/lib/pgsql/15/pg_wal"
+deflogdir="/var/lib/pgsql/15/log/pg_log"
+defarchive="/var/lib/pgsql/15/archive"
 
 dbname=$defdb
 owname=$defown
@@ -139,12 +139,15 @@ clear
     		spcdir=$(echo "$row" | awk '{print $1}')
 		spcname=$(echo "$row" | awk '{print $5}')
     		disk_space=$(df $spcdir | tail -n +2 | awk '{print $2}')
-    		disk_space_byte=$(echo "$disk_space * 1024" | bc)
+		#disk_space_byte=$(echo "$disk_space * 1024" | bc)
+		disk_space_byte=$(echo $(($disk_space * 1024)))
     		free_size=$(df $spcdir | tail -n +2 | awk '{print $4}')
-		free_byte=$(echo "$free_size * 1024" | bc)
+		#free_byte=$(echo "$free_size * 1024" | bc)
+		free_byte=$(echo $(($free_size * 1024)))
 		#size=$(echo "$row" | awk '{print $3}')
-    		percentage=$(echo "scale=2; ($free_byte / $disk_space_byte) * 100" | bc)
-    		echo "$spcname : $free_byte / $disk_space_byte(free/total) $percentage% free"
+    		#percentage=$(echo "scale=2; ($free_byte / $disk_space_byte) * 100" | bc)
+    		percentage=$(echo "$free_byte; $disk_space_byte" | awk '{printf "%.2f", ($1 / $2) * 100}')
+		echo "$spcname : $free_byte / $disk_space_byte(free/total) $percentage% free"
 	done
 	echo -e ""
         read -p "##### Press Enter #####" ynread
@@ -268,8 +271,10 @@ clear
 	echo "Disk Freespace"
 	disk_space1=$(df $datapath | tail -n +2 | awk '{print $2}')
 	used_space1=$(df $walpath | tail -n +2 | awk '{print $3}')
-	free_space1=$(echo "$disk_space1 - $used_space1" | bc)
-	free_percentage1=$(echo "scale=2; ($free_space1 / $disk_space1) * 100" | bc)
+	#free_space1=$(echo "$disk_space1 - $used_space1" | bc)
+	free_space1=$(echo $(($disk_space1 - $used_space1)))
+	#free_percentage1=$(echo "scale=2; ($free_space1 / $disk_space1) * 100" | bc)
+	free_percentage1=$(echo "$free_space1; $disk_space1" | awk '{printf "%.2f", ($1 / $2) * 100}')
 	echo "free percentage : $free_percentage1%"	
 	echo -e ""
 	read -p "##### Press Enter #####" ynread
@@ -283,8 +288,10 @@ clear
 	echo "Disk Freespace"
         disk_space2=$(df $walpath | tail -n +2 | awk '{print $2}')
         used_space2=$(df $walpath | tail -n +2 | awk '{print $3}')
-        free_space2=$(echo "$disk_space2 - $used_space2" | bc)
-        free_percentage2=$(echo "scale=2; ($free_space2 / $disk_space2) * 100" | bc)
+        #free_space2=$(echo "$disk_space2 - $used_space2" | bc)
+        free_space2=$(echo $(($disk_space2 - $used_space2)))
+	#free_percentage2=$(echo "scale=2; ($free_space2 / $disk_space2) * 100" | bc)
+	free_percentage2=$(echo "$free_space2; $disk_space2" | awk '{printf "%.2f", ($1 / $2) * 100}')
 	echo "free percentage : $free_percentage2%"
 	echo -e ""
         read -p "##### Press Enter #####" ynread
@@ -298,8 +305,10 @@ clear
 	echo "Disk Freespace"
 	disk_space3=$(df $walpath | tail -n +2 | awk '{print $2}')
         used_space3=$(df $walpath | tail -n +2 | awk '{print $3}')
-        free_space3=$(echo "$disk_space3 - $used_space3" | bc)
-        free_percentage3=$(echo "scale=2; ($free_space3 / $disk_space3) * 100" | bc)
+        #free_space3=$(echo "$disk_space3 - $used_space3" | bc)
+	free_space3=$(echo $(($disk_space3 - $used_space3)))
+        #free_percentage3=$(echo "scale=2; ($free_space3 / $disk_space3) * 100" | bc)
+	free_percentage3=$(echo "$free_space3; $disk_space3" | awk '{printf "%.2f", ($1 / $2) * 100}')
 	echo "free percentage : $free_percentage3%"
 	echo -e ""
         read -p "##### Press Enter #####" ynread
@@ -313,9 +322,11 @@ clear
 	echo "Disk Freespace"
         disk_space4=$(df $walpath | tail -n +2 | awk '{print $2}')
         used_space4=$(df $walpath | tail -n +2 | awk '{print $3}')
-        free_space4=$(echo "$disk_space4 - $used_space4" | bc)
-        free_percentage4=$(echo "scale=2; ($free_space4 / $disk_space4) * 100" | bc)
-        echo "free percentage : $free_percentage4%"
+        #free_space4=$(echo "$disk_space4 - $used_space4" | bc)
+	free_space4=$(echo $(($disk_space4 - $used_space4)))
+        #free_percentage4=$(echo "scale=2; ($free_space4 / $disk_space4) * 100" | bc)
+        free_percentage4=$(echo "$free_space4; $disk_space4" | awk '{printf "%.2f", ($1 / $2) * 100}')
+	echo "free percentage : $free_percentage4%"
 	echo -e ""
         read -p "##### Press Enter #####" ynread
         echo -e ""
@@ -513,43 +524,34 @@ clear
 
 \c)
 
-echo "Input Database Name(default : postgres) : "
-read dbname
-echo -e ""
-
-if [[ -z "$dbname" ]]; then
-        dbname=$defdb
-fi
-echo $dbname
-
 echo "Input Owner Name(default : postgres) : "
 read owname
-echo -e ""
-
-
 if [[ -z "$owname" ]]; then
         owname=$defown
 fi
-echo $owname
-
-echo "Input Port Number(default : 5432) : "
-read portnum
-echo -e ""
-
-if [[ -z "$portnum" ]]; then
-        portnum=$defport
-fi
-echo $portnum
-
 
 echo "Input Owner Password(default : postgres) : "
 read -s ownpwd
-echo -e ""
-
 if [[ -z "$ownpwd" ]]; then
         ownpwd=$defpwd
 fi
-echo $ownpwd
+
+echo "Input Database Name(default : postgres) : "
+read imsidbname
+if [[ -z "$dbname" ]]; then
+        imsidbname=$defdb
+	dbname=$imsidbname
+else
+	dbname=$imsidbname
+fi
+
+
+echo "Input Port Number(default : 5432) : "
+read portnum
+if [[ -z "$portnum" ]]; then
+        portnum=$defport
+fi
+
 
 ;;
 
@@ -614,11 +616,14 @@ echo $archpath
     		spcdir=$(echo "$row" | awk '{print $1}')
 		spcname=$(echo "$row" | awk '{print $5}')
     		disk_space=$(df $spcdir | tail -n +2 | awk '{print $2}')
-    		disk_space_byte=$(echo "$disk_space * 1024" | bc)
-    		free_size=$(df $spcdir | tail -n +2 | awk '{print $4}')
-		free_byte=$(echo "$free_size * 1024" | bc)
+    		#disk_space_byte=$(echo "$disk_space * 1024" | bc)
+    		disk_space_byte=$(echo $(($disk_space * 1024)))
+		free_size=$(df $spcdir | tail -n +2 | awk '{print $4}')
+		#free_byte=$(echo "$free_size * 1024" | bc)
+		free_byte=$(echo $(($free_size * 1024)))
 		#size=$(echo "$row" | awk '{print $3}')
-    		percentage=$(echo "scale=2; ($free_byte / $disk_space_byte) * 100" | bc)
+    		#percentage=$(echo "scale=2; ($free_byte / $disk_space_byte) * 100" | bc)
+		percentage=$(echo "$free_byte; $disk_space_byte" | awk '{printf "%.2f", ($1 / $2) * 100}')
     		echo "$spcname : $free_byte / $disk_space_byte(free/total) $percentage% free" >> ./chkreslt/2_tablespace.txt
 	done
 	echo -e "" >> ./chkreslt/2_tablespace.txt
@@ -682,8 +687,10 @@ echo $archpath
 	echo "Disk Freespace" >> ./chkreslt/9_disksize.txt
 	disk_space1=$(df $datapath | tail -n +2 | awk '{print $2}')
 	used_space1=$(df $walpath | tail -n +2 | awk '{print $3}')
-	free_space1=$(echo "$disk_space1 - $used_space1" | bc)
-	free_percentage1=$(echo "scale=2; ($free_space1 / $disk_space1) * 100" | bc)
+	#free_space1=$(echo "$disk_space1 - $used_space1" | bc)
+	free_space1=$(echo $(($disk_space1 - $used_space1)))
+	#free_percentage1=$(echo "scale=2; ($free_space1 / $disk_space1) * 100" | bc)
+	free_percentage1=$(echo "$free_space1; $disk_space1" | awk '{printf "%.2f", ($1 / $2) * 100}')
 	echo "free percentage : $free_percentage1%" >> ./chkreslt/9_disksize.txt
 	echo -e "" >> ./chkreslt/9_disksize.txt
 
@@ -695,8 +702,10 @@ echo $archpath
 	echo "Disk Freespace" >> ./chkreslt/9_disksize.txt
         disk_space2=$(df $walpath | tail -n +2 | awk '{print $2}')
         used_space2=$(df $walpath | tail -n +2 | awk '{print $3}')
-        free_space2=$(echo "$disk_space2 - $used_space2" | bc)
-        free_percentage2=$(echo "scale=2; ($free_space2 / $disk_space2) * 100" | bc)
+        #free_space2=$(echo "$disk_space2 - $used_space2" | bc)
+        free_space2=$(echo $(($disk_space2 - $used_space2)))
+	#free_percentage2=$(echo "scale=2; ($free_space2 / $disk_space2) * 100" | bc)
+	free_percentage2=$(echo "$free_space2; $disk_space2" | awk '{printf "%.2f", ($1 / $2) * 100}')
 	echo "free percentage : $free_percentage2%" >> ./chkreslt/9_disksize.txt
 	echo -e "" >> ./chkreslt/9_disksize.txt
 
@@ -708,8 +717,10 @@ echo $archpath
 	echo "Disk Freespace" >> ./chkreslt/9_disksize.txt
 	disk_space3=$(df $walpath | tail -n +2 | awk '{print $2}')
         used_space3=$(df $walpath | tail -n +2 | awk '{print $3}')
-        free_space3=$(echo "$disk_space3 - $used_space3" | bc)
-        free_percentage3=$(echo "scale=2; ($free_space3 / $disk_space3) * 100" | bc)
+        #free_space3=$(echo "$disk_space3 - $used_space3" | bc)
+	free_space3=$(echo $(($disk_space3 - $used_space3)))
+        #free_percentage3=$(echo "scale=2; ($free_space3 / $disk_space3) * 100" | bc)
+	free_percentage3=$(echo "$free_space3; $disk_space3" | awk '{printf "%.2f", ($1 / $2) * 100}')
 	echo "free percentage : $free_percentage3%" >> ./chkreslt/9_disksize.txt
 	echo -e "" >> ./chkreslt/9_disksize.txt
 
@@ -721,9 +732,11 @@ echo $archpath
 	echo "Disk Freespace" >> ./chkreslt/9_disksize.txt
         disk_space4=$(df $walpath | tail -n +2 | awk '{print $2}')
         used_space4=$(df $walpath | tail -n +2 | awk '{print $3}')
-        free_space4=$(echo "$disk_space4 - $used_space4" | bc)
-        free_percentage4=$(echo "scale=2; ($free_space4 / $disk_space4) * 100" | bc)
-        echo "free percentage : $free_percentage4%" >> ./chkreslt/9_disksize.txt
+        #free_space4=$(echo "$disk_space4 - $used_space4" | bc)
+	free_space4=$(echo $(($disk_space4 - $used_space4)))
+        #free_percentage4=$(echo "scale=2; ($free_space4 / $disk_space4) * 100" | bc)
+        free_percentage4=$(echo "$free_space4; $disk_space4" | awk '{printf "%.2f", ($1 / $2) * 100}')
+	echo "free percentage : $free_percentage4%" >> ./chkreslt/9_disksize.txt
 	echo -e "" >> ./chkreslt/9_disksize.txt
 
         echo -e "##### Database Size #####" >> ./chkreslt/10_datasize.txt

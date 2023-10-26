@@ -8,6 +8,7 @@ SELECT
 	else 'NORMAL STATE' end as message
 FROM pg_class c
 LEFT JOIN pg_class t ON c.reltoastrelid = t.oid
-WHERE c.relkind IN ('r', 'm')
+WHERE c.relkind IN ('r', 'm' ,'p')
+and c.relnamespace not in('11', '13235')
 ORDER BY 4
 limit 10;
