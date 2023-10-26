@@ -1,7 +1,7 @@
 #!/bin/bash
-PATH=/usr/pgsql-14/bin/:$PATH
 DATETIME=`date +%Y%m%d_%H%M%S`
 CON_CHK_FLAG="t"
+RETRY_ROLE=0
 
 # LOGGING
 function logging() {
@@ -18,9 +18,9 @@ logging "Exec get_DB_info()..."
                 logging "\n| Database List "
                 logging "-----------------"
     shopt -s lastpipe
-    psql -q --host=${CON_HOST} --port=${CON_PORT} --username=${CON_USER} -x -A -l | grep Name | while read line
+    psql -q --host=${CON_HOST} --port=${CON_PORT} --username=${CON_USER} -d ${CON_DATABASE} -x -A -l | grep Name | while read line
     do
-        psql -q --host=${CON_HOST} --port=${CON_PORT} --username=${CON_USER} -xAtc "SELECT pg_database_size('${line:5}') AS size" | read size
+        psql -q --host=${CON_HOST} --port=${CON_PORT} --username=${CON_USER} -d ${CON_DATABASE} -xAtc "SELECT pg_database_size('${line:5}') AS size" | read size
                 logging "| ${line:5} "$((${size:5}/1024/1024))"MB"
         sizeSum=$((${sizeSum} + ${size:5}))
     done
@@ -33,27 +33,27 @@ function print_Progress() {
 	sleep $1
 	while [[ -f ~/.progress.lock ]]; 
 	do
-		PROGRESS=`psql -h ${CON_HOST} -p ${CON_PORT} -U ${CON_USER} -c "SELECT bak_info.total||'MB' as TOTAL_BACKUP_SIZE, bak_info.now||'MB' AS RECEIVED_SIZE, bak_info.tbs_total AS TOTAL_TABLESPACE_COUNT, bak_info.tbs_now AS RECEIVED_TABLESPACE_COUNT, (bak_info.now*100/bak_info.total)||'%' AS PROGRESS FROM (SELECT CASE backup_total WHEN NULL THEN 0 ELSE backup_total/1024/1024 END AS total, CASE backup_streamed WHEN NULL THEN 0 ELSE backup_streamed/1024/1024 END AS now, CASE tablespaces_total WHEN NULL THEN 0 ELSE tablespaces_total END AS tbs_total, CASE tablespaces_streamed WHEN NULL THEN 0 ELSE tablespaces_streamed END AS tbs_now FROM pg_stat_progress_basebackup)as bak_info"`
+		PROGRESS=`psql -h ${CON_HOST} -p ${CON_PORT} -U ${CON_USER} -d ${CON_DATABASE} -c "SELECT bak_info.total||'MB' as TOTAL_BACKUP_SIZE, bak_info.now||'MB' AS RECEIVED_SIZE, bak_info.tbs_total AS TOTAL_TABLESPACE_COUNT, bak_info.tbs_now AS RECEIVED_TABLESPACE_COUNT, (bak_info.now*100/bak_info.total)||'%' AS PROGRESS FROM (SELECT CASE backup_total WHEN NULL THEN 0 ELSE backup_total/1024/1024 END AS total, CASE backup_streamed WHEN NULL THEN 0 ELSE backup_streamed/1024/1024 END AS now, CASE tablespaces_total WHEN NULL THEN 0 ELSE tablespaces_total END AS tbs_total, CASE tablespaces_streamed WHEN NULL THEN 0 ELSE tablespaces_streamed END AS tbs_now FROM pg_stat_progress_basebackup)as bak_info"`
 		logging "\n$PROGRESS"
 	sleep $1
 	done
 }
 
 function calculate_Time() {
-	elapse_time=`echo "$2-$1" | bc`
-	hour_e=`echo "$elapse_time/3600" | bc`
-	min_e=`echo "$elapse_time/60%60" | bc`
-	sec_e=`echo "$elapse_time%60" | bc`
+	elapse_time=`echo $(($2-$1))`
+	hour_e=`echo $((elapse_time/3600))`
+	min_e=`echo $((elapse_time/60%60))`
+	sec_e=`echo $((elapse_time%60))`
 	logging "elapsed time for backup = ${hour_e}h : ${min_e}m : ${sec_e}s"
 }
 
 # 2022-12-08 
 function tablespace_remapping() {
 logging "Exec tablespace_remapping()..."
-        LOCS=`psql -q --host=${CON_HOST} --port=${CON_PORT} --username=${CON_USER} -x -A -t -c "\db+"`
+        LOCS=`psql -q --host=${CON_HOST} --port=${CON_PORT} --username=${CON_USER} -d ${CON_DATABASE}  -x -A -t -c "\db+"`
         logging "Tablespace info :"
 	echo -e "Tablespace info :\n" >> ${BAK_LOG_DIR}/tbs_remap_info
-	`psql -q --host=${CON_HOST} --port=${CON_PORT} --username=${CON_USER} -x -A -t -c "SELECT oid as SymboliclinkName, spcname as TablespaceName FROM pg_catalog.pg_tablespace" >> ${BAK_LOG_DIR}/tbs_remap_info` 
+	`psql -q --host=${CON_HOST} --port=${CON_PORT} --username=${CON_USER} -d ${CON_DATABASE} -x -A -t -c "SELECT oid as SymboliclinkName, spcname as TablespaceName FROM pg_catalog.pg_tablespace" >> ${BAK_LOG_DIR}/tbs_remap_info` 
 	logging "\n$LOCS"
 	echo ${BAK_DIR}/tbs_remap/tbs_remap_info
 	echo -e "\n$LOCS" >> ${BAK_LOG_DIR}/tbs_remap_info
@@ -76,6 +76,7 @@ case $1 in
         1) echo "0 0 * * * " ;;
         2) echo "0 0 * * 7 " ;;
         3) echo "0 0 1 * * " ;;
+	4) echo "${BAK_TIME_MINUTE} ${BAK_TIME_HOUR} ${BAK_DAY_OF_MONTH} * ${BAK_DAY_OF_WEEK}" ;;
 esac
 }
 
@@ -89,6 +90,8 @@ logging "Exec calPeriod()..."
 	sed -i "/opensql_backup/d" ${BAK_DIR}/crontmpf
         echo "$CRON_CMD" >> ${BAK_DIR}/crontmpf
         crontab -r
+        crontab -r
+        crontab -r
         crontab -i ${BAK_DIR}/crontmpf
         logging "$CRON_CMD"
         rm -rf ${BAK_DIR}
@@ -99,18 +102,20 @@ function checkHost() {
 if [[ ${CON_TYPE} =~ [pP] ]] || [[ ${CON_TYPE} =~ [sS] ]]; then
         for PHOST in ${CON_HOST[@]};
         do
-            RECV_MODE=`psql -q -h ${PHOST} -p ${CON_PORT} -U ${CON_USER} -A -t -c "SELECT pg_is_in_recovery()"`
+            RECV_MODE=`psql -q -h ${PHOST} -p ${CON_PORT} -U ${CON_USER} -d ${CON_DATABASE} -A -t -c "SELECT pg_is_in_recovery()"`
 		CON_CHK_FLAG="t"
 		if [[ ${CON_TYPE} =~ [pP] ]] && [[ $RECV_MODE == f ]]; then
 		    CON_HOST=${PHOST}
+		    break;
 		elif [[ ${CON_TYPE} =~ [sS] ]] && [[ $RECV_MODE == t ]]; then	
 		    CON_HOST=${PHOST}
+		    break;
 		else
 		    CON_CHK_FLAG="f"
 		fi
         done
 elif [[ ${CON_TYPE} =~ [lL] ]]; then
-	RECV_MODE=`psql -q -h ${CON_HOST} -p ${CON_PORT} -U ${CON_USER} -A -t -c "SELECT pg_is_in_recovery()"`
+	RECV_MODE=`psql -q -h ${CON_HOST} -p ${CON_PORT} -U ${CON_USER} -d ${CON_DATABASE} -A -t -c "SELECT pg_is_in_recovery()"`
 	CON_CHK_FLAG="t"
         if  [[ $RECV_MODE != f ]]; then
                     CON_CHK_FLAG="f"
@@ -119,13 +124,36 @@ elif [[ ${CON_TYPE} =~ [lL] ]]; then
 fi
 }
 
+function checkHostRetry(){
+        CON_CHK_COUNT=0
+        while [[ ${CON_CHK_COUNT} -le ${CON_RETRY_COUNT} ]] && [[ ${CON_CHK_FLAG} == "f" ]];
+        do
+		logging "RETRY CHECK CONNECTION $((CON_CHK_COUNT+1)) TIMES"
+                if [[ $CON_RETRY_TIME != "" ]] && [[ ${CON_RETRY_TIME} -ge 0 ]]; then
+                        sleep ${CON_RETRY_TIME}
+                else
+                        sleep 10
+                fi
+                checkHost
+                CON_CHK_COUNT=$((CON_CHK_COUNT+1))
+        done
+}
+
+
 function checkBackup() {
-	BACKUP_PROGRESS=`psql -q -h ${CON_HOST} -p ${CON_PORT} -A -t -c "SELECT * FROM pg_stat_progress_basebackup"`
+	BACKUP_PROGRESS=`psql -q -h ${CON_HOST} -p ${CON_PORT} -d ${CON_DATABASE} -A -t -c "SELECT * FROM pg_stat_progress_basebackup" -U ${CON_USER}`
 	if [[ ${BACKUP_PROGRESS} != "" ]]; then
 		logging "Another backup is in progress..."
 		exit 4
         fi
 }
+
+function archive_cleanup() {
+	OLDEST_WAL=`pg_controldata ${BAK_DIR} | grep "REDO WAL"`
+	OLDEST_WAL=${OLDEST_WAL#*:}
+	logging `pg_archivecleanup ${BAK_ARCHIVE_DIR} ${OLDEST_WAL} -d`
+}
+
 # ECHO USAGE
 if [ $# -lt 1 ] || [ $# -gt 2 ]; then
         echo "Usage: $0 <CONFIG FILE> [OPTION]"
@@ -140,12 +168,15 @@ if [[ -e ${1} ]] && [[ -s ${1} ]] ; then
                 CRD=`pwd`
                 . $CRD/${1}
                 CONFIG_PATH="$CRD/${1}"
+		PATH=/usr/pgsql-${CON_PGVERSION}/bin:$PATH
         elif [[ ! ${1} == */* ]]; then
                 . ./${1}
                 CRD=`pwd`
                 CONFIG_PATH="$CRD/${1}"
+		PATH=/usr/pgsql-${CON_PGVERSION}/bin:$PATH
         else
                 . ${1}
+		PATH=/usr/pgsql-${CON_PGVERSION}/bin:$PATH
         fi
 else
         echo "[ERR:00] : Configuration file does not exist."
@@ -219,33 +250,38 @@ if [[ ! ${CON_TYPE} =~ [pP] ]] && [[ ! ${CON_TYPE} =~ [sS] ]] && [[ ! ${CON_TYPE
 fi
 
 checkHost
-
 if [[ ${CON_CHK_FLAG} == "f" ]] && [[ ${CON_RETRY_COUNT} != "" ]] && [[ ${CON_RETRY_COUNT} -gt 1 ]]; then
-        CON_CHK_COUNT=0
-        while [[ ${CON_CHK_COUNT} -le ${CON_RETRY_COUNT} ]] && [[ ${CON_CHK_FLAG} == "f" ]];
-        do
-                if [[ $CON_RETRY_TIME != "" ]] && [[ ${CON_RETRY_TIME} -ge 0 ]]; then
-                        sleep ${CON_RETRY_TIME}
-                else
-                        sleep 10
-                fi
-                checkHost
-                CON_CHK_COUNT=$((CON_CHK_COUNT+1))
-        done
+	checkHostRetry
+fi
+
+
+if [[ ${CON_CHK_FLAG} == "f" ]] && [[ ${CON_RETRY_ROLE} =~ [yY] ]]; then
+	if [[ ${CON_TYPE} =~ [pP] ]]; then 
+		CON_TYPE=S
+	elif [[ ${CON_TYPE} =~ [sS] ]]; then
+		CON_TYPE=P
+	fi	
+        logging "Retry WITH CON_TYPE : ${CON_TYPE}"
+	RETRY_ROLE=1
+	checkHostRetry
 fi
 
 if [[ ${CON_CHK_FLAG} == "f" ]]; then
         logging "[ERR:04] : Please, check connection to host"
         exit 4;
 fi
-BAK_OPTS="-h ${CON_HOST} -p ${CON_PORT} -U ${CON_USER} $BAK_OPTS"
+BAK_OPTS="-h ${CON_HOST} -p ${CON_PORT} -U ${CON_USER} $BAK_OPTS "
 
 
 # SET PERIOD
 logging "SET PERIOD..."
-if [[ ! $BAK_PERIOD =~ ^[0-3] ]] || [[ ${#BAK_PERIOD} -gt 1 ]]; then
+if [[ ! ${BAK_PERIOD} =~ ^[0-4] ]] || [[ ${#BAK_PERIOD} -gt 1 ]]; then
         logging "[ERR:02] : Please, Input valid period in configuration file"
         exit 2
+	if [[ ${BAK_PERIOD} -eq 4 ]] && [[ ! ${BAK_PERIOD} =~ [0-9*,] ]] ; then
+		logging "[ERR:02] : Please, Input valid period in configuration file"
+	        exit 2
+	fi
 fi
 
 
@@ -301,15 +337,33 @@ case $BAK_PERIOD in
 			print_Progress ${BAK_CHECK_PROGRESS_TIME} &
 		fi
 		pg_basebackup ${BAK_OPTS} >> ${BAK_LOG_DIR}/backup-${DATETIME}.log 2>&1
-		if [[ $? -eq 0 ]]; then
-                	logging "BACKUP COMPLETE.." 
-			if [[ -f ${BAK_LOG_DIR}/tbs_remap_info ]]; then	
-				mv ${BAK_LOG_DIR}/tbs_remap_info ${BAK_DIR}/tbs_remap_info
-				if [[ -d ${BAK_DIR}/pg_tblspc ]] && [[ ! -e ${BAK_DIR}/pg_tblspc ]]; then
-					rm ${BAK_DIR}/pg_tblspc/*
-				fi
-			fi
-		else
+                if [[ $? -eq 0 ]]; then
+                        logging "BASEBACKUP COMPLETE"
+                        logging "VERIFYING BACKUP.."
+                        pg_verifybackup ${BAK_DIR} >> ${BAK_LOG_DIR}/backup-${DATETIME}.log 2>&1
+                        VERIFY_SUCCESS=0
+                        if [[ $? -eq 0 ]]; then
+                                logging "BACKUP SUCCESSFULLY VERIFIED"
+                                VERIFY_SUCCESS=1
+                        else
+                                logging "FAILED TO VERIFY BACKUP!! PLEASE SEE LOGS!!"
+                                VERIFY_SUCCESS=0
+                        fi
+                        if [[ -f ${BAK_LOG_DIR}/tbs_remap_info ]]; then
+                                mv ${BAK_LOG_DIR}/tbs_remap_info ${BAK_DIR}/tbs_remap_info
+                                if [[ -d ${BAK_DIR}/pg_tblspc ]] && [[ ! -e ${BAK_DIR}/pg_tblspc ]]; then
+                                        rm ${BAK_DIR}/pg_tblspc/*
+                                fi
+                        fi
+                        if [[ ${BAK_REMOVE_ARCHIVE} =~ [yY] ]]; then
+                                if [[ $VERIFY_SUCCESS -eq 1 ]]; then
+                                        logging "ARCHIVING FILES WILL BE CLEANED"
+                                        archive_cleanup
+                                else
+                                        logging "VERIFYING BACKUP FAILED, ARCHIVING FILES WILL NOT BE CLEANED"
+                                fi
+                        fi
+                else
                 	logging "BACKUP FAILED..\nPLEASE SEE LOGS..." 
 		fi
          	if [[ ${BAK_CHECK_PROGRESS_ENABLE} =~ [yY] ]] && [[ -f ~/.progress.lock ]]; then 
@@ -321,3 +375,4 @@ case $BAK_PERIOD in
         *) editCron $BAK_PERIOD "$SHELL_PATH $CONFIG_PATH --immediately"
                 logging "BACKUP RESERVED.." ;;
 esac
+
