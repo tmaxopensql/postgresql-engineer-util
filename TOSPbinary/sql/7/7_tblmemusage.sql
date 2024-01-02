@@ -1,6 +1,6 @@
 begin;
 
-create extension pg_buffercache;
+create extension if not exists pg_buffercache;
 /*
 select c.relname as table_name, 
 pg_size_pretty(count(*) * 8192) as shared_memory_size
@@ -50,7 +50,5 @@ from
 order by percent_of_table desc;
 
 select pg_sleep(5);
-
-drop extension pg_buffercache;
 
 end;

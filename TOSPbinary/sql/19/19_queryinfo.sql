@@ -1,6 +1,6 @@
 begin;
 
-create extension pg_stat_statements;
+create extension if not exists pg_stat_statements;
 
 select
 	a.queryid,
@@ -47,7 +47,6 @@ WHERE
 
 select pg_sleep(5);
 
-drop extension pg_stat_statements;
 
 end;
 

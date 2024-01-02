@@ -2,7 +2,7 @@
 
 begin;
 
-create extension pg_stat_statements;
+create extension if not exists pg_stat_statements;
 
 
 select 
@@ -20,7 +20,5 @@ order by a.max_exec_time desc
 limit 10;
 
 select pg_sleep(5);
-
-drop extension pg_stat_statements;
 
 end;

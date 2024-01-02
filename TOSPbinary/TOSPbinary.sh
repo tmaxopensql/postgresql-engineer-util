@@ -7,7 +7,7 @@
 ####################################
 
 echo -e ""
-echo "##### Start Tmax OpenSQL Binary #####"
+echo "##### Start Tmax OpenSQL for PostgreSQL Binary #####"
 echo -e ""
 
 defdb="postgres"
@@ -397,11 +397,26 @@ clear
         echo -e ""
         read -p "##### Press Enter #####" ynread
         echo ""
+	
+	if [ -d ./log_error_list ]; then
+		echo "directory exist"
+		datetime=`date +%Y%m%d%H%M%S`
+	else
+		mkdir ./log_error_list
+	fi
 
         echo -e "##### PGLOG Error Check #####"
         echo -e ""
-        grep -i -E "오류|error" $logpath/postgresql*
+	echo -e "##### Writing ERROR LOG ON FILE #####"
+	echo -e ""
+        grep -i -E "오류|error" $logpath/postgresql* >> ./log_error_list/error_$datetime.txt
         echo -e ""
+	if [ -e ./log_error_list/error_$datetime.txt ]; then
+		echo "##### Finish write file #####"
+	else
+		echo "##### FILE writing failed... #####"
+	fi
+	echo -e ""
         read -p "##### Press Enter #####" ynread
         echo -e ""
 
@@ -509,12 +524,12 @@ clear
         read -p "##### Press Enter #####" ynread
         echo -e ""
 
-        echo -e "##### Transaction Wraparound TABLE Check #####"
-        echo -e ""
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/20/20_txwraparound_table.sql
-        echo -e ""
-        read -p "##### Press Enter #####" ynread
-        echo -e ""
+#        echo -e "##### Transaction Wraparound TABLE Check #####"
+#        echo -e ""
+#        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/20/20_txwraparound_table.sql
+#        echo -e ""
+#        read -p "##### Press Enter #####" ynread
+#        echo -e ""
 
 
 
@@ -588,7 +603,14 @@ echo $archpath
 
 
 \f)
-	mkdir ./chkreslt
+	if [ -d ./chkreslt ]; then
+		datetime=`date +%Y%m%d%H%M%S`
+		echo "dir exists, move old file to $datetime"
+		mkdir ./chkreslt/$datetime
+		mv ./chkreslt/*.txt ./chkreslt/$datetime
+	else
+		mkdir ./chkreslt
+	fi
 
 	echo -e "##### Version Check #####" >> ./chkreslt/0_version.txt
 	echo -e "" >> ./chkreslt/0_version.txt
@@ -823,10 +845,10 @@ echo $archpath
         PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/20/20_txwraparound_db.sql >> ./chkreslt/20_txwraparound.txt
         echo -e "" >> ./chkreslt/20_txwraparound.txt
 
-        echo -e "##### Transaction Wraparound TABLE Check #####" >> ./chkreslt/20_txwraparound.txt
-        echo -e "" >> ./chkreslt/20_txwraparound.txt
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/20/20_txwraparound_table.sql >> ./chkreslt/20_txwraparound.txt
-        echo -e "" >> ./chkreslt/20_txwraparound.txt
+#        echo -e "##### Transaction Wraparound TABLE Check #####" >> ./chkreslt/20_txwraparound.txt
+#        echo -e "" >> ./chkreslt/20_txwraparound.txt
+#        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/20/20_txwraparound_table.sql >> ./chkreslt/20_txwraparound.txt
+#        echo -e "" >> ./chkreslt/20_txwraparound.txt
 
 ;;
 

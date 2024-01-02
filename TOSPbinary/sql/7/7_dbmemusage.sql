@@ -1,6 +1,6 @@
 begin;
 
-create extension pg_buffercache;
+create extension if not exists pg_buffercache;
 
 with
 pg_total as
@@ -37,7 +37,5 @@ order by percent_of_pgbuffer desc
 ;
 
 select pg_sleep(5);
-
-drop extension pg_buffercache;
 
 end;
