@@ -67,16 +67,16 @@ clear
 
 echo "
 ######################## SELECT CONTENTS ########################
-# 0. Version			# 11. PG Process		#
-# 1. Database & Owner		# 12. Session			#
-# 2. Tablespace			# 13. Log			#
-# 3. Archive Check		# 14. Vacuum & Analyze		#
-# 4. Postgresql.conf		# 15. Live & Dead Tuples	#
-# 5. Pg_hba.conf		# 16. Lock			#
-# 6. Memory Configure	 	# 17. Extension	list		#
-# 7. Shared Memory Status	# 18. Top 10 Query ID		#
-# 8. Hit ratio			# 19. Query Information		#
-# 9. Disk Size			# 20. Txid Wraparound check	#
+# 00. Version			# 11. PG Process		#
+# 01. Database & Owner		# 12. Session			#
+# 02. Tablespace		# 13. Log			#
+# 03. Archive Check		# 14. Vacuum & Analyze		#
+# 04. Postgresql.conf		# 15. Live & Dead Tuples	#
+# 05. Pg_hba.conf		# 16. Lock			#
+# 06. Memory Configure	 	# 17. Extension	list		#
+# 07. Shared Memory Status	# 18. Top 10 Query ID		#
+# 08. Hit ratio			# 19. Query Information		#
+# 09. Disk Size			# 20. Txid Wraparound check	#
 # 10. Data Size			#				#
 #################################################################
 # \c. Change Default Connection Info				#
@@ -93,31 +93,31 @@ echo -e ""
 dirname=${dbname}
 
 case $num in
-0)
+00)
 clear
 
 	echo -e "##### Version Check #####"
 	echo -e ""
 #psql -f /var/lib/pgsql/check/sql/0_version.sql
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/0/0_version.sql
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/00/00_version.sql
 	echo -e ""
 	read -p "##### Press Enter #####" ynread
 	echo -e ""
 ;;
 
-1)
+01)
 clear
 
 	echo -e "##### Database & Owner List Check #####"
 	echo -e ""
 #psql -f /var/lib/pgsql/check/sql/0_dblist.sql
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/1/1_dblist.sql
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/01/01_dblist.sql
 	echo -e ""
 	read -p "##### Press Enter #####" ynread
 	echo -e ""
 ;;
 
-2)
+02)
 clear
 
         pg_base="$PGDATA/base"
@@ -125,7 +125,7 @@ clear
 
         echo -e "##### Tablespace #####"
         echo -e ""
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -v v1="'$pg_base'" -v v2="'$pg_global'" -f ./sql/2/2_tablespace.sql
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -v v1="'$pg_base'" -v v2="'$pg_global'" -f ./sql/02/02_tablespace.sql
         echo -e ""
         read -p "##### Press Enter #####" ynread
         echo -e ""
@@ -155,7 +155,7 @@ clear
 
 ;;
 
-3)
+03)
 
 clear
 
@@ -168,98 +168,98 @@ clear
 
 ;;
 
-4)
+04)
 
 clear
 
         echo -e "##### postgresql.conf Check #####"
         echo -e ""
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/4/4_postgresqlconf.sql
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/04/04_postgresqlconf.sql
         echo -e ""
         read -p "##### Press Enter #####" ynread
         echo -e ""
 
 ;;
 
-5)
+05)
 clear
 	echo -e "##### Pg_hba Setting Check #####"
 	echo -e ""
-	PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/5/5_pghbachk.sql
+	PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/05/05_pghbachk.sql
 	echo -e ""
 	read -p "##### Press Enter #####" ynread
 	echo -e ""
 
 ;;
 
-6)
+06)
 
 clear
 
         echo -e "##### Shared Memory Configure #####"
         echo -e ""
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/6/6_sharedmemory.sql
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/06/06_sharedmemory.sql
         echo -e ""
         read -p "##### Press Enter #####" ynread
         echo -e ""
 
         echo -e "##### Process Memory Check #####"
         echo -e ""
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/6/6_processmemory.sql
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/06/06_processmemory.sql
         echo -e ""
         read -p "##### Press Enter #####" ynread
         echo -e ""
 
 ;;
 
-7)
+07)
 
 clear
 
 	echo -e "##### Database Memory Usage #####"
 	echo -e ""
-	PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/7/7_dbmemusage.sql
+	PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/07/07_dbmemusage.sql
 	echo -e ""
 	read -p "##### Press Enter #####" ynread
 	echo -e ""
 
         echo -e "##### Table Memory Usage #####"
         echo -e ""
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/7/7_tblmemusage.sql
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/07/07_tblmemusage.sql
         echo -e ""
         read -p "##### Press Enter #####" ynread
         echo -e ""
 
 ;;
 
-8)
+08)
 
 clear
 
         echo -e "##### Buffer Cache Hit ratio #####"
         echo -e ""
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/8/8_bufferhit.sql
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/08/08_bufferhit.sql
         echo -e ""
         read -p "##### Press Enter #####" ynread
         echo -e ""
 
         echo -e "##### Table Hit ratio #####"
         echo -e ""
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/8/8_tablehit.sql
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/08/08_tablehit.sql
         echo -e ""
         read -p "##### Press Enter #####" ynread
         echo -e ""
 
         echo -e "##### Index Hit ratio #####"
         echo -e ""
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/8/8_indexhit.sql
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/08/08_indexhit.sql
         echo -e ""
         read -p "##### Press Enter #####" ynread
         echo -e ""
 
 ;;
 
-9)
+09)
 
 clear
 
