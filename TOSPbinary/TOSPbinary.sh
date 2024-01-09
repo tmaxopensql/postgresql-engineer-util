@@ -614,19 +614,19 @@ echo $archpath
 
 	echo -e "##### Version Check #####" >> ./chkreslt/0_version.txt
 	echo -e "" >> ./chkreslt/0_version.txt
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/0/0_version.sql >> ./chkreslt/0_version.txt
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/00/00_version.sql >> ./chkreslt/00_version.txt
 	echo -e "" >> ./chkreslt/0_version.txt
 
 	echo -e "##### Database & Owner List Check #####" >> ./chkreslt/1_dbownerchk.txt
 	echo -e "" >> ./chkreslt/1_dbownerchk.txt
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/1/1_dblist.sql >> ./chkreslt/1_dbownerchk.txt
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/01/01_dblist.sql >> ./chkreslt/01_dbownerchk.txt
 	echo -e "" >> ./chkreslt/1_dbownerchk.txt
 
 	pg_base="$PGDATA/base"
         pg_global="$PGDATA/global"
 	echo -e "##### Tablespace #####" >> ./chkreslt/2_tablespace.txt
 	echo -e "" >> ./chkreslt/2_tablespace.txt
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -v v1="'$pg_base'" -v v2="'$pg_global'" -f ./sql/2/2_tablespace.sql >> ./chkreslt/2_tablespace.txt
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -v v1="'$pg_base'" -v v2="'$pg_global'" -f ./sql/02/02_tablespace.sql >> ./chkreslt/02_tablespace.txt
 	echo -e "" >> ./chkreslt/2_tablespace.txt
 	
 	echo -e "##### Disk Free Space #####" >> ./chkreslt/2_tablespace.txt
@@ -646,120 +646,120 @@ echo $archpath
 		#size=$(echo "$row" | awk '{print $3}')
     		#percentage=$(echo "scale=2; ($free_byte / $disk_space_byte) * 100" | bc)
 		percentage=$(echo "$free_byte; $disk_space_byte" | awk '{printf "%.2f", ($1 / $2) * 100}')
-    		echo "$spcname : $free_byte / $disk_space_byte(free/total) $percentage% free" >> ./chkreslt/2_tablespace.txt
+    		echo "$spcname : $free_byte / $disk_space_byte(free/total) $percentage% free" >> ./chkreslt/02_tablespace.txt
 	done
-	echo -e "" >> ./chkreslt/2_tablespace.txt
+	echo -e "" >> ./chkreslt/02_tablespace.txt
 
-	echo -e "##### Archive Check #####" >> ./chkreslt/3_archive.txt
-	echo -e "" >> ./chkreslt/3_archive.txt
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -c "show archive_mode;" -c "SELECT setting as archive_state_directory FROM pg_settings where name='archive_command';" >> ./chkreslt/3_archive.txt
-	echo -e "" >> ./chkreslt/3_archive.txt	
+	echo -e "##### Archive Check #####" >> ./chkreslt/03_archive.txt
+	echo -e "" >> ./chkreslt/03_archive.txt
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -c "show archive_mode;" -c "SELECT setting as archive_state_directory FROM pg_settings where name='archive_command';" >> ./chkreslt/03_archive.txt
+	echo -e "" >> ./chkreslt/03_archive.txt	
 
-	echo -e "##### postgresql.conf Check #####" >> ./chkreslt/4_postgresqlconf.txt
-	echo -e "" >> ./chkreslt/4_postgresqlconf.txt
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/4/4_postgresqlconf.sql >> ./chkreslt/4_postgresqlconf.txt
-	echo -e "" >> ./chkreslt/4_postgresqlconf.txt
+	echo -e "##### postgresql.conf Check #####" >> ./chkreslt/04_postgresqlconf.txt
+	echo -e "" >> ./chkreslt/04_postgresqlconf.txt
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/4/4_postgresqlconf.sql >> ./chkreslt/04_postgresqlconf.txt
+	echo -e "" >> ./chkreslt/04_postgresqlconf.txt
 
-	echo -e "##### Pg_hba Setting Check #####" >> ./chkreslt/5_pghbaconf.txt
-	echo -e "" >> ./chkreslt/5_pghbaconf.txt
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/5/5_pghbachk.sql >> ./chkreslt/5_pghbaconf.txt
-	echo -e "">> ./chkreslt/5_pghbaconf.txt
+	echo -e "##### Pg_hba Setting Check #####" >> ./chkreslt/05_pghbaconf.txt
+	echo -e "" >> ./chkreslt/05_pghbaconf.txt
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/05/05_pghbachk.sql >> ./chkreslt/05_pghbaconf.txt
+	echo -e "">> ./chkreslt/05_pghbaconf.txt
 
-	echo -e "##### Shared Memory Configure #####" >> ./chkreslt/6_memconfig.txt
-	echo -e "" >> ./chkreslt/6_memconfig.txt
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/6/6_sharedmemory.sql >> ./chkreslt/6_memconfig.txt
-	echo -e "" >> ./chkreslt/6_memconfig.txt
+	echo -e "##### Shared Memory Configure #####" >> ./chkreslt/06_memconfig.txt
+	echo -e "" >> ./chkreslt/06_memconfig.txt
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/06/06_sharedmemory.sql >> ./chkreslt/06_memconfig.txt
+	echo -e "" >> ./chkreslt/06_memconfig.txt
 
-        echo -e "##### Process Memory Check #####" >> ./chkreslt/6_memconfig.txt
-        echo -e "" >> ./chkreslt/6_memconfig.txt
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/6/6_processmemory.sql >> ./chkreslt/6_memconfig.txt
-        echo -e "" >> ./chkreslt/6_memconfig.txt
+        echo -e "##### Process Memory Check #####" >> ./chkreslt/06_memconfig.txt
+        echo -e "" >> ./chkreslt/06_memconfig.txt
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/06/06_processmemory.sql >> ./chkreslt/06_memconfig.txt
+        echo -e "" >> ./chkreslt/06_memconfig.txt
 
-	echo -e "##### Database Memory Usage #####" >> ./chkreslt/7_shmemstatus.txt
-	echo -e "" >> ./chkreslt/7_shmemstatus.txt
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/7/7_dbmemusage.sql >> ./chkreslt/7_shmemstatus.txt
-	echo -e "" >> ./chkreslt/7_shmemstatus.txt
+	echo -e "##### Database Memory Usage #####" >> ./chkreslt/07_shmemstatus.txt
+	echo -e "" >> ./chkreslt/07_shmemstatus.txt
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/07/07_dbmemusage.sql >> ./chkreslt/07_shmemstatus.txt
+	echo -e "" >> ./chkreslt/07_shmemstatus.txt
 
-        echo -e "##### Table Memory Usage #####" >> ./chkreslt/7_shmemstatus.txt
-        echo -e "" >> ./chkreslt/7_shmemstatus.txt
-        echo -e "" >> ./chkreslt/7_shmemstatus.txt
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/7/7_tblmemusage.sql >> ./chkreslt/7_shmemstatus.txt
-        echo -e "" >> ./chkreslt/7_shmemstatus.txt
+        echo -e "##### Table Memory Usage #####" >> ./chkreslt/07_shmemstatus.txt
+        echo -e "" >> ./chkreslt/07_shmemstatus.txt
+        echo -e "" >> ./chkreslt/07_shmemstatus.txt
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/07/07_tblmemusage.sql >> ./chkreslt/07_shmemstatus.txt
+        echo -e "" >> ./chkreslt/07_shmemstatus.txt
 
-        echo -e "##### Buffer Cache Hit ratio #####" >> ./chkreslt/8_hitratio.txt
-        echo -e "" >> ./chkreslt/8_hitratio.txt
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/8/8_bufferhit.sql >> ./chkreslt/8_hitratio.txt
-        echo -e "" >> ./chkreslt/8_hitratio.txt
+        echo -e "##### Buffer Cache Hit ratio #####" >> ./chkreslt/08_hitratio.txt
+        echo -e "" >> ./chkreslt/08_hitratio.txt
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/08/08_bufferhit.sql >> ./chkreslt/08_hitratio.txt
+        echo -e "" >> ./chkreslt/08_hitratio.txt
 
-        echo -e "##### Table Hit ratio #####" >> ./chkreslt/8_hitratio.txt
-        echo -e "" >> ./chkreslt/8_hitratio.txt
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/8/8_tablehit.sql >> ./chkreslt/8_hitratio.txt
-        echo -e "" >> ./chkreslt/8_hitratio.txt
+        echo -e "##### Table Hit ratio #####" >> ./chkreslt/08_hitratio.txt
+        echo -e "" >> ./chkreslt/08_hitratio.txt
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/08/08_tablehit.sql >> ./chkreslt/08_hitratio.txt
+        echo -e "" >> ./chkreslt/08_hitratio.txt
 
         echo -e "##### Index Hit ratio #####" >> ./chkreslt/8_hitratio.txt
-        echo -e "" >> ./chkreslt/8_hitratio.txt
-        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/8/8_indexhit.sql >> ./chkreslt/8_hitratio.txt
-        echo -e "" >> ./chkreslt/8_hitratio.txt
+        echo -e "" >> ./chkreslt/08_hitratio.txt
+        PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $imsidbname -q -v v1="'$imsidbname'" -f ./sql/08/08_indexhit.sql >> ./chkreslt/08_hitratio.txt
+        echo -e "" >> ./chkreslt/08_hitratio.txt
 
-	echo -e "##### Data Cluster Size #####" >> ./chkreslt/9_disksize.txt
-	echo -e "" >> ./chkreslt/9_disksize.txt
-	echo "Data Cluster Disk Usage" >> ./chkreslt/9_disksize.txt
-        du -sh $datapath >> ./chkreslt/9_disksize.txt
-	echo -e "" >> ./chkreslt/9_disksize.txt
-	echo "Disk Freespace" >> ./chkreslt/9_disksize.txt
+	echo -e "##### Data Cluster Size #####" >> ./chkreslt/09_disksize.txt
+	echo -e "" >> ./chkreslt/09_disksize.txt
+	echo "Data Cluster Disk Usage" >> ./chkreslt/09_disksize.txt
+        du -sh $datapath >> ./chkreslt/09_disksize.txt
+	echo -e "" >> ./chkreslt/09_disksize.txt
+	echo "Disk Freespace" >> ./chkreslt/09_disksize.txt
 	disk_space1=$(df $datapath | tail -n +2 | awk '{print $2}')
 	used_space1=$(df $walpath | tail -n +2 | awk '{print $3}')
 	#free_space1=$(echo "$disk_space1 - $used_space1" | bc)
 	free_space1=$(echo $(($disk_space1 - $used_space1)))
 	#free_percentage1=$(echo "scale=2; ($free_space1 / $disk_space1) * 100" | bc)
 	free_percentage1=$(echo "$free_space1; $disk_space1" | awk '{printf "%.2f", ($1 / $2) * 100}')
-	echo "free percentage : $free_percentage1%" >> ./chkreslt/9_disksize.txt
-	echo -e "" >> ./chkreslt/9_disksize.txt
+	echo "free percentage : $free_percentage1%" >> ./chkreslt/09_disksize.txt
+	echo -e "" >> ./chkreslt/09_disksize.txt
 
-        echo -e "##### WAL Directory Size #####" >> ./chkreslt/9_disksize.txt
-        echo -e "" >> ./chkreslt/9_disksize.txt
-	echo "WAL Disk Usage" >> ./chkreslt/9_disksize.txt
-        du -sh $walpath >> ./chkreslt/9_disksize.txt
-        echo -e "" >> ./chkreslt/9_disksize.txt
-	echo "Disk Freespace" >> ./chkreslt/9_disksize.txt
+        echo -e "##### WAL Directory Size #####" >> ./chkreslt/09_disksize.txt
+        echo -e "" >> ./chkreslt/09_disksize.txt
+	echo "WAL Disk Usage" >> ./chkreslt/09_disksize.txt
+        du -sh $walpath >> ./chkreslt/09_disksize.txt
+        echo -e "" >> ./chkreslt/09_disksize.txt
+	echo "Disk Freespace" >> ./chkreslt/09_disksize.txt
         disk_space2=$(df $walpath | tail -n +2 | awk '{print $2}')
         used_space2=$(df $walpath | tail -n +2 | awk '{print $3}')
         #free_space2=$(echo "$disk_space2 - $used_space2" | bc)
         free_space2=$(echo $(($disk_space2 - $used_space2)))
 	#free_percentage2=$(echo "scale=2; ($free_space2 / $disk_space2) * 100" | bc)
 	free_percentage2=$(echo "$free_space2; $disk_space2" | awk '{printf "%.2f", ($1 / $2) * 100}')
-	echo "free percentage : $free_percentage2%" >> ./chkreslt/9_disksize.txt
-	echo -e "" >> ./chkreslt/9_disksize.txt
+	echo "free percentage : $free_percentage2%" >> ./chkreslt/09_disksize.txt
+	echo -e "" >> ./chkreslt/09_disksize.txt
 
-        echo -e "##### Log Directory Size #####" >> ./chkreslt/9_disksize.txt
-        echo -e "" >> ./chkreslt/9_disksize.txt
-	echo "Log Disk Usage" >> ./chkreslt/9_disksize.txt
-        du -sh $logpath >> ./chkreslt/9_disksize.txt
-        echo -e "" >> ./chkreslt/9_disksize.txt
-	echo "Disk Freespace" >> ./chkreslt/9_disksize.txt
+        echo -e "##### Log Directory Size #####" >> ./chkreslt/09_disksize.txt
+        echo -e "" >> ./chkreslt/09_disksize.txt
+	echo "Log Disk Usage" >> ./chkreslt/09_disksize.txt
+        du -sh $logpath >> ./chkreslt/09_disksize.txt
+        echo -e "" >> ./chkreslt/09_disksize.txt
+	echo "Disk Freespace" >> ./chkreslt/09_disksize.txt
 	disk_space3=$(df $walpath | tail -n +2 | awk '{print $2}')
         used_space3=$(df $walpath | tail -n +2 | awk '{print $3}')
         #free_space3=$(echo "$disk_space3 - $used_space3" | bc)
 	free_space3=$(echo $(($disk_space3 - $used_space3)))
         #free_percentage3=$(echo "scale=2; ($free_space3 / $disk_space3) * 100" | bc)
 	free_percentage3=$(echo "$free_space3; $disk_space3" | awk '{printf "%.2f", ($1 / $2) * 100}')
-	echo "free percentage : $free_percentage3%" >> ./chkreslt/9_disksize.txt
-	echo -e "" >> ./chkreslt/9_disksize.txt
+	echo "free percentage : $free_percentage3%" >> ./chkreslt/09_disksize.txt
+	echo -e "" >> ./chkreslt/09_disksize.txt
 
-        echo -e "##### Archive Directory Size #####" >> ./chkreslt/9_disksize.txt
-        echo -e "" >> ./chkreslt/9_disksize.txt
-	echo "Archive Disk Usage" >> ./chkreslt/9_disksize.txt
-        du -sh $archpath >> ./chkreslt/9_disksize.txt
-        echo -e "" >> ./chkreslt/9_disksize.txt
-	echo "Disk Freespace" >> ./chkreslt/9_disksize.txt
+        echo -e "##### Archive Directory Size #####" >> ./chkreslt/09_disksize.txt
+        echo -e "" >> ./chkreslt/09_disksize.txt
+	echo "Archive Disk Usage" >> ./chkreslt/09_disksize.txt
+        du -sh $archpath >> ./chkreslt/09_disksize.txt
+        echo -e "" >> ./chkreslt/09_disksize.txt
+	echo "Disk Freespace" >> ./chkreslt/09_disksize.txt
         disk_space4=$(df $walpath | tail -n +2 | awk '{print $2}')
         used_space4=$(df $walpath | tail -n +2 | awk '{print $3}')
         #free_space4=$(echo "$disk_space4 - $used_space4" | bc)
 	free_space4=$(echo $(($disk_space4 - $used_space4)))
         #free_percentage4=$(echo "scale=2; ($free_space4 / $disk_space4) * 100" | bc)
         free_percentage4=$(echo "$free_space4; $disk_space4" | awk '{printf "%.2f", ($1 / $2) * 100}')
-	echo "free percentage : $free_percentage4%" >> ./chkreslt/9_disksize.txt
-	echo -e "" >> ./chkreslt/9_disksize.txt
+	echo "free percentage : $free_percentage4%" >> ./chkreslt/09_disksize.txt
+	echo -e "" >> ./chkreslt/09_disksize.txt
 
         echo -e "##### Database Size #####" >> ./chkreslt/10_datasize.txt
         echo -e "" >> ./chkreslt/10_datasize.txt
