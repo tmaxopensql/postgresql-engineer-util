@@ -9,6 +9,8 @@ LOCALES="${LOCALES[6]/\"/}"
 LOCALES="${LOCALES#*=}"
 LOCALES=${LOCALES:0:5}
 
+DB_NAME_ARRAY=()
+
 # LOGGING
 function logging() {
         LOGDATE=`date +%Y-%m-%d\ %H:%M:%S`
@@ -41,6 +43,32 @@ logging "Exec get_DB_info()..."
     logging "Total Database Size : "$((${SIZE_TOTAL}/1024/1024))"MB"
 
 }
+
+function get_DB_name() {
+        if [[ "LOCALES" == ko_KR ]]; then
+                logging "Get Database Names"
+                db_name_string=$(psql -q --host=$CON_HOST --port=$CON_PORT -d $CON_DATABASE -U $CON_USER -A -l -x | grep "이름")
+                DB_NAME_ARRAY=($(echo "$db_name_string" | tr '\n' ' '))
+
+                for((i=0;i<${#DB_NAME_ARRAY[@]};i++));
+                do
+                        DB_NAME_ARRAY[$i]=${DB_NAME_ARRAY[$i]/*|/}
+                        logging "Database Names ${i} = ${DB_NAME_ARRAY[$i]}"
+                done
+
+        else
+                logging "Get Database Names"
+                db_name_string=$(psql -q --host=$CON_HOST --port=$CON_PORT -d $CON_DATABASE -U $CON_USER -A -l -x | grep Name)
+                DB_NAME_ARRAY=($(echo "$db_name_string" | tr '\n' ' '))
+
+                for((i=0;i<${#DB_NAME_ARRAY[@]};i++));
+                do
+                        DB_NAME_ARRAY[$i]=${DB_NAME_ARRAY[$i]/*|/}
+                        logging "Database Names ${i} = ${DB_NAME_ARRAY[$i]}"
+                done
+        fi
+}
+
 
 function print_Progress() {
         touch ~/.progress.lock
@@ -258,7 +286,9 @@ else
                 rm -f ${BAK_DIR}/checkfile
                 BAK_DIR=${BAK_DIR}/backup-${DATETIME}
                 mkdir ${BAK_DIR}
-                BAK_OPTS="${BAK_OPTS} -D ${BAK_DIR}"
+		if [[ ${BAK_TYPE} =~ ^[pP] ]]; then
+	                BAK_OPTS="${BAK_OPTS} -D ${BAK_DIR}"
+		fi
 fi
 
 
@@ -304,110 +334,144 @@ if [[ ! ${BAK_PERIOD} =~ ^[0-4] ]] || [[ ${#BAK_PERIOD} -gt 1 ]]; then
         fi
 fi
 
+#여기까진 Physical Logical 동일
 
-# SET COMPRESS
-logging "SET COMPRESS..."
-if [[ ${#BAK_COMPRESS_LEVEL} -gt 0 ]] && [[ ${BAK_COMPRESS_ENABLE} =~ [yY] ]]; then
-        BAK_OPTS="$BAK_OPTS -Ft --compress=$BAK_COMPRESS_LEVEL "
-else
-        tablespace_remapping
+if [[ ${BAK_TYPE} =~ ^[pP] ]]; then
+
+   # SET COMPRESS
+   logging "SET COMPRESS..."
+   if [[ ${#BAK_COMPRESS_LEVEL} -gt 0 ]] && [[ ${BAK_COMPRESS_ENABLE} =~ [yY] ]]; then
+           BAK_OPTS="$BAK_OPTS -Ft --compress=$BAK_COMPRESS_LEVEL "
+   else
+           tablespace_remapping
+   fi
+
+   # SET CHECKPOINT
+   logging "SET CHECKPOINT..."
+   if [[ ${BAK_CHECKPOINT_FAST} =~ [yY] ]] ; then
+           BAK_OPTS="$BAK_OPTS --checkpoint=fast "
+   fi
+
+   # SET SYNC
+   logging "SET SYNC..."
+   if [[ ${BAK_ASYNC} =~ [yY] ]] ; then
+           BAK_OPTS="$BAK_OPTS --no-sync "
+   fi
+
+   # SET CHECK_PROGRESS_TIME
+   if [[ ${BAK_CHECK_PROGRESS_ENABLE} =~ [yY] ]] && [[ ! ${BAK_CHECK_PROGRESS_TIME} =~ ^[1-9]$|^[1-9]{1}[0-9]$ ]]; then
+           logging "[ERR:05] BAK_CHECK_PROGRESS_TIME is not decimal value OR out of range!!"
+           exit 05
+   fi
+
+   # SET MAX_RATE
+   logging "SET MAX_RATE..."
+   if [[ ${MAX_RATE} != "" ]] ; then
+           BAK_OPTS="$BAK_OPTS --max-rate=${MAX_RATE} "
+   fi
+
+   # SET LABEL
+   logging "SET LABEL"
+   BAK_OPTS="$BAK_OPTS --label=${DATETIME}"
+
+   logging "$BAK_OPTS"
+   # BACKUP DATABASE CLUSTER
+
+   logging "SETUP CONFIGURATION COMPLETE..."
+   logging "CHECKING ANOTHER BACKUP IS ON PROGRESS..."
+   checkBackup
+   logging "START BACKUP..."
+   get_DB_info
+
+   case $BAK_PERIOD in
+           0)      start_time=`date +%s`
+                   if [[ ${BAK_CHECK_PROGRESS_ENABLE} =~ [yY] ]]; then
+                           logging "SET CHECK_PROGRESS OF BACKUP"
+                           print_Progress ${BAK_CHECK_PROGRESS_TIME} &
+                   fi
+                   pg_basebackup ${BAK_OPTS} >> ${BAK_LOG_DIR}/backup-${DATETIME}.log 2>&1
+                   if [[ $? -eq 0 ]]; then
+                           if [[ ${BAK_CHECK_PROGRESS_ENABLE} =~ [yY] ]] && [[ -f ~/.progress.lock ]]; then
+                                   rm ~/.progress.lock
+                           fi
+                           logging "BASEBACKUP COMPLETE"
+                           if [[ ${BAK_COMPRESS_ENABLE} =~ [yY] ]]; then
+                                   logging "CAN'T VERIFY BACKUP WHEN COMPRESSION IS ENABLED"
+                           else
+                                   logging "VERIFYING BACKUP.."
+                                   VERIFY_SUCCESS=0
+                                   pg_verifybackup ${BAK_DIR} >> ${BAK_LOG_DIR}/backup-${DATETIME}.log 2>&1
+                                   if [[ $? -eq 0 ]]; then
+                                           logging "BACKUP SUCCESSFULLY VERIFIED"
+                                           get_oldest_wal
+                                           VERIFY_SUCCESS=1
+                                   else
+                                           logging "FAILED TO VERIFY BACKUP!! PLEASE SEE LOGS!!"
+                                           VERIFY_SUCCESS=0
+                                   fi
+                           fi
+                           if [[ -f ${BAK_LOG_DIR}/oldest_wal ]]; then
+                                   mv ${BAK_LOG_DIR}/oldest_wal ${BAK_DIR}/oldest_wal
+                           fi
+
+                           if [[ -f ${BAK_LOG_DIR}/tbs_remap_info ]]; then
+                                   mv ${BAK_LOG_DIR}/tbs_remap_info ${BAK_DIR}/tbs_remap_info
+                                   if [[ -d ${BAK_DIR}/pg_tblspc ]] && [[ ! -e ${BAK_DIR}/pg_tblspc ]]; then
+                                           rm -f ${BAK_DIR}/pg_tblspc/*
+                                   fi
+                           fi
+
+                           if [[ ${BAK_REMOVE_ARCHIVE} =~ [yY] ]]; then
+                                   if [[ $VERIFY_SUCCESS -eq 1 ]]; then
+                                           logging "ARCHIVING FILES WILL BE CLEANED"
+                                           archive_cleanup
+                                   else
+                                           logging "VERIFYING BACKUP FAILED, ARCHIVING FILES WILL NOT BE CLEANED"
+                                   fi
+                           fi
+                           end_time=`date +%s`
+                           calculate_Time $start_time $end_time
+                   else
+                           logging "BACKUP FAILED..\nPLEASE SEE LOGS..."
+                           if [[ ${BAK_CHECK_PROGRESS_ENABLE} =~ [yY] ]] && [[ -f ~/.progress.lock ]]; then
+                                   rm ~/.progress.lock
+                           fi
+                           if [[ -f ${BAK_LOG_DIR}/tbs_remap_info ]]; then
+                                   rm ${BAK_LOG_DIR}/tbs_remap_info
+                           fi
+                   fi
+                   ;;
+           *) editCron $BAK_PERIOD "$SHELL_PATH $CONFIG_PATH --immediately"
+                   logging "BACKUP RESERVED.." ;;
+   esac
+elif [[ ${BAK_TYPE} =~ ^[lL] ]]; then
+	get_DB_name
+  # 여기에 pg 체크하는 기능 등 백업 이전에 수행이필요한 내용들 추가
+   #pgdump 실행에 필요한 옵션은 여기에서 $BAK_OPTS 변수에 이어 붙이는 형태로 설정하는게 좋을 것 같음.
+   
+   #   SET DUMP_FORMAT
+   case $BAK_PERIOD in
+           0)
+              for((i=0; i<${#DB_NAME_ARRAY[@]}; i++));
+              do
+               if [[ "${DB_NAME_ARRAY[i]}" == "template0" || "${DB_NAME_ARRAY[i]}" == "template1" ]]; then
+                 logging "${DB_NAME_ARRAY[i]} will not backup.."
+                 continue
+               fi
+                 logging "Start Logical PG_DUMP Backup ${DB_NAME_ARRAY[i]} Database"
+		 BAK_OPTS="${BAK_OPTS} -f ${BAK_DIR}/${DATETIME}_${DB_NAME_ARRAY[i]}.sql -d ${DB_NAME_ARRAY[i]} -C" 
+		 logging "pg_dump OPTIONS : ${BAK_OPTS}"
+		 START_TIME=$SECONDS
+                 pg_dump ${BAK_OPTS} >> ${BAK_LOG_DIR}/backup-${DATETIME}.log 2>&1
+		 END_TIME=$SECONDS
+		 if [[ $? -ne 0 ]]; then
+			logging "pg_dump failed backup ${DB_NAME_ARRAY[i]}"
+		 fi
+		 logging "BACKUP TIME ${DB_NAME_ARRAY[i]} : $((END_TIME - START_TIME)) seconds"
+              done
+           
+           ;;
+               *) editCron $BAK_PERIOD "$SHELL_PATH $CONFIG_PATH --immediately"
+           logging "BACKUP RESERVED.." ;;
+   esac
 fi
-
-# SET CHECKPOINT
-logging "SET CHECKPOINT..."
-if [[ ${BAK_CHECKPOINT_FAST} =~ [yY] ]] ; then
-        BAK_OPTS="$BAK_OPTS --checkpoint=fast "
-fi
-
-# SET SYNC
-logging "SET SYNC..."
-if [[ ${BAK_ASYNC} =~ [yY] ]] ; then
-        BAK_OPTS="$BAK_OPTS --no-sync "
-fi
-
-# SET CHECK_PROGRESS_TIME
-if [[ ${BAK_CHECK_PROGRESS_ENABLE} =~ [yY] ]] && [[ ! ${BAK_CHECK_PROGRESS_TIME} =~ ^[1-9]$|^[1-9]{1}[0-9]$ ]]; then
-        logging "[ERR:05] BAK_CHECK_PROGRESS_TIME is not decimal value OR out of range!!"
-        exit 05
-fi
-
-# SET MAX_RATE
-logging "SET MAX_RATE..."
-if [[ ${MAX_RATE} != "" ]] ; then
-        BAK_OPTS="$BAK_OPTS --max-rate=${MAX_RATE} "
-fi
-
-# SET LABEL
-logging "SET LABEL"
-BAK_OPTS="$BAK_OPTS --label=${DATETIME}"
-
-logging "$BAK_OPTS"
-# BACKUP DATABASE CLUSTER
-
-logging "SETUP CONFIGURATION COMPLETE..."
-logging "CHECKING ANOTHER BACKUP IS ON PROGRESS..."
-checkBackup
-logging "START BACKUP..."
-get_DB_info
-
-case $BAK_PERIOD in
-        0)      start_time=`date +%s`
-                if [[ ${BAK_CHECK_PROGRESS_ENABLE} =~ [yY] ]]; then
-                        logging "SET CHECK_PROGRESS OF BACKUP"
-                        print_Progress ${BAK_CHECK_PROGRESS_TIME} &
-                fi
-                pg_basebackup ${BAK_OPTS} >> ${BAK_LOG_DIR}/backup-${DATETIME}.log 2>&1
-                if [[ $? -eq 0 ]]; then
-                        if [[ ${BAK_CHECK_PROGRESS_ENABLE} =~ [yY] ]] && [[ -f ~/.progress.lock ]]; then
-                                rm ~/.progress.lock
-                        fi
-                        logging "BASEBACKUP COMPLETE"
-                        if [[ ${BAK_COMPRESS_ENABLE} =~ [yY] ]]; then
-                                logging "CAN'T VERIFY BACKUP WHEN COMPRESSION IS ENABLED"
-                        else
-                                logging "VERIFYING BACKUP.."
-                                VERIFY_SUCCESS=0
-                                pg_verifybackup ${BAK_DIR} >> ${BAK_LOG_DIR}/backup-${DATETIME}.log 2>&1
-                                if [[ $? -eq 0 ]]; then
-                                        logging "BACKUP SUCCESSFULLY VERIFIED"
-                                        get_oldest_wal
-                                        VERIFY_SUCCESS=1
-                                else
-                                        logging "FAILED TO VERIFY BACKUP!! PLEASE SEE LOGS!!"
-                                        VERIFY_SUCCESS=0
-                                fi
-                        fi
-                        if [[ -f ${BAK_LOG_DIR}/oldest_wal ]]; then
-                                mv ${BAK_LOG_DIR}/oldest_wal ${BAK_DIR}/oldest_wal
-                        fi
-
-                        if [[ -f ${BAK_LOG_DIR}/tbs_remap_info ]]; then
-                                mv ${BAK_LOG_DIR}/tbs_remap_info ${BAK_DIR}/tbs_remap_info
-                                if [[ -d ${BAK_DIR}/pg_tblspc ]] && [[ ! -e ${BAK_DIR}/pg_tblspc ]]; then
-                                        rm -f ${BAK_DIR}/pg_tblspc/*
-                                fi
-                        fi
-
-                        if [[ ${BAK_REMOVE_ARCHIVE} =~ [yY] ]]; then
-                                if [[ $VERIFY_SUCCESS -eq 1 ]]; then
-                                        logging "ARCHIVING FILES WILL BE CLEANED"
-                                        archive_cleanup
-                                else
-                                        logging "VERIFYING BACKUP FAILED, ARCHIVING FILES WILL NOT BE CLEANED"
-                                fi
-                        fi
-                        end_time=`date +%s`
-                        calculate_Time $start_time $end_time
-                else
-                        logging "BACKUP FAILED..\nPLEASE SEE LOGS..."
-                        if [[ ${BAK_CHECK_PROGRESS_ENABLE} =~ [yY] ]] && [[ -f ~/.progress.lock ]]; then
-                                rm ~/.progress.lock
-                        fi
-                        if [[ -f ${BAK_LOG_DIR}/tbs_remap_info ]]; then
-                                rm ${BAK_LOG_DIR}/tbs_remap_info
-                        fi
-                fi
-                ;;
-        *) editCron $BAK_PERIOD "$SHELL_PATH $CONFIG_PATH --immediately"
-                logging "BACKUP RESERVED.." ;;
-esac
