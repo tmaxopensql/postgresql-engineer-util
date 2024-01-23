@@ -232,6 +232,45 @@ function checkPhysicalOptions() {
    BAK_OPTS="$BAK_OPTS --label=${DATETIME}"
 }
 
+function checkLogicalOptions() {
+	#SET COMPRESS
+	LOGICAL_BAK_COMPRESS_FORMAT=""
+	logging "SET COMPRESS..."
+	if [[ ${#LOGICAL_BAK_COMPRESS_LEVEL} -gt 0 ]] && [[ ${LOGICAL_BAK_COMPRESS_ENABLE} =~ [yY] ]]; then
+		case ${LOGICAL_BAK_COMPRESS_TYPE} in
+			c)
+				LOGICAL_BAK_COMPRESS_FORMAT=custom
+				BAK_OPTS="$BAK_OPTS -Fc --compress=${LOGICAL_BAK_COMPRESS_LEVEL}"
+				logging "Backup Format = ${LOGICAL_BAK_COMPRESS_FORMAT} and COMPRESS_LEVEL = ${LOGICAL_BAK_COMPRESS_LEVEL}"
+			;;
+			d)
+				LOGICAL_BAK_COMPRESS_FORMAT=directory
+				BAK_OPTS="$BAK_OPTS -Fd --compress=${LOGICAL_BAK_COMPRESS_LEVEL}"
+                                logging "Backup Format = ${LOGICAL_BAK_COMPRESS_FORMAT} and COMPRESS_LEVEL = ${LOGICAL_BAK_COMPRESS_LEVEL}"
+			;;
+			t)
+				LOGICAL_BAK_COMPRESS_FORMAT=tar
+				BAK_OPTS="$BAK_OPTS -Ft --compress=${LOGICAL_BAK_COMPRESS_LEVEL}"
+                                logging "Backup Format = ${LOGICAL_BAK_COMPRESS_FORMAT} and COMPRESS_LEVEL = ${LOGICAL_BAK_COMPRESS_LEVEL}"
+			;;
+			p)
+				LOGICAL_BAK_COMPRESS_FORMAT=plain
+				BAK_OPTS="$BAK_OPTS -Fp --compress=${LOGICAL_BAK_COMPRESS_LEVEL}"
+				logging "Backup Format = ${LOGICAL_BAK_COMPRESS_FORMAT} and COMPRESS_LEVEL = ${LOGICAL_BAK_COMPRESS_LEVEL}"
+			;;
+			*)	
+				logging "LOGICAL_BAK_COMPRESS_TYPE is ${LOGICAL_BAK_COMPRESS_TYPE}...??? Check opensql.config -> LOGICAL_BAK_COMPRESS_TYPE please."
+				exit 1;
+		esac
+	fi
+
+	# SET LOCK_WAIT_TIMEOUT
+	if [[ ${LOGICAL_LOCK_WAIT_TIMEOUT_ENABLE} =~ [yY] ]]; then
+		BAK_OPTS="$BAK_OPTS --lock-wait-timeout=${LOGICAL_LOCK_WAIT_TIMEOUT}"
+		logging "lock-wait-timeout = ${LOGICAL_LOCK_WAIT_TIMEOUT}"
+	fi
+}
+
 ################# MAIN ######################
 checkConfiguration "$0" "$1"
 
@@ -342,13 +381,14 @@ if [[ ${BAK_TYPE} == PHYSICAL ]]; then
 
 ################ LOGICAL BACKUP ################
 elif [[ ${BAK_TYPE} == LOGICAL ]]; then
+	checkLogicalOptions
 	get_info_from_DB
         for((i=0; i<${#DB_NAME_ARRAY[@]}; i++)); do
 		if [[ "${DB_NAME_ARRAY[i]}" == "template0" ]]; then
         		logging "${DB_NAME_ARRAY[i]} will not backup.."
                 	continue
  		fi
-		DUMP_OPTS="${BAK_OPTS} -f ${BAK_DIR}/${DATETIME}_${DB_NAME_ARRAY[i]}.sql -d ${DB_NAME_ARRAY[i]} -C" 
+		DUMP_OPTS="${BAK_OPTS} -d ${DB_NAME_ARRAY[i]} -f ${BAK_DIR}/${DATETIME}_${DB_NAME_ARRAY[i]}.${LOGICAL_BAK_COMPRESS_FORMAT} -C " 
                 logging "Start Logical PG_DUMP Backup ${DB_NAME_ARRAY[i]} Database"
 		logging "pg_dump OPTIONS : ${DUMP_OPTS}"
 
