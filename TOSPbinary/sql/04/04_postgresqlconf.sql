@@ -1,9 +1,9 @@
-SELECT 
-name, 
-context, 
-unit, 
-setting as now_value, 
-boot_val as default_value , 
-reset_val as if_reset_default_value
+SELECT
+  name as "Parameter Name",
+  context as "Context",
+  unit as "Unit",
+  setting as "Present Value",
+  boot_val as "Default Value",
+  reset_val as "Reset Default Value"
 FROM pg_settings
 where source ='configuration file' and setting != boot_val;
