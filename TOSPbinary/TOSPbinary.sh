@@ -370,7 +370,7 @@ clear
 
 clear
 
-	echo -e "##### Session Status ##### "
+	echo -e "##### All Session & Active Session Status Limit 30 ##### "
 	echo -e ""
 	PGPASSWORD=$ownpwd psql -U $owname -p $portnum -d $dbname -q -f ./sql/12/12_sessioncheck.sql
 	echo -e ""
