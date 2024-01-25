@@ -1,14 +1,35 @@
-/* session check */
-select 
-	pid as process_id, 
-	usename as owner,
-	datname as dbname,
-	application_name as application_name,
-	client_addr || ':' || client_port as ip_port_info,
-	to_char(backend_start, 'YYYY-MM-DD HH24:MI:SS') as session_started_time,
-	to_char(state_change, 'YYYY-MM-DD HH24:MI:SS') as session_changed_time,
-	state as current_status,
-	--substr(query,1,100) as query,
-	backend_type
-from 
-	pg_stat_activity;
+/* all session check */
+SELECT
+        pid as "PROCESS ID",
+        usename as "ROLE",
+        datname as "DATABASE NAME",
+        application_name as "APPLICATION NAME",
+        client_addr || ':' || client_port as "IP:PORT",
+        to_char(backend_start, 'YYYY-MM-DD HH24:MI:SS') as "SESSION START TIME",
+        to_char(state_change, 'YYYY-MM-DD HH24:MI:SS') as "SESSION CHANGE TIME",
+        state as "STATUS",
+        --substr(query,1,100) as query,
+        backend_type as "BACKEND TYPE"
+FROM
+        pg_stat_activity
+limit 30;
+
+/* STATUS SESSION CHECK */
+SELECT
+        pid as "PROCESS ID",
+        usename as "ROLE",
+        datname as "DATABASE NAME",
+        application_name as "APPLICATION NAME",
+        client_addr || ':' || client_port as "IP:PORT",
+        to_char(backend_start, 'YYYY-MM-DD HH24:MI:SS') as "SESSION START TIME",
+        to_char(state_change, 'YYYY-MM-DD HH24:MI:SS') as "SESSION CHANGE TIME",
+        state as "STATUS",
+        --substr(query,1,100) as query,
+        backend_type as "BACKEND TYPE"
+FROM
+        pg_stat_activity
+WHERE
+        state = 'active'
+ORDER BY
+        backend_start
+limit 30;
