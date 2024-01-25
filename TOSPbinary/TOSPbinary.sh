@@ -391,32 +391,35 @@ clear
 	
 clear
 
-        echo -e "##### PGLOG Check #####"
-        echo -e ""
-        ls -alrt $logpath
+        echo -e "##### PGLOG Check Latest 20 #####"
+        ls -lart $logpath | tail -20
         echo -e ""
         read -p "##### Press Enter #####" ynread
         echo ""
-	
-	if [ -d ./log_error_list ]; then
-		echo "directory exist"
-		datetime=`date +%Y%m%d%H%M%S`
-	else
-		mkdir ./log_error_list
-	fi
+        datetime=`date "+%Y-%m-%d_%H:%M:%S"`
 
-        echo -e "##### PGLOG Error Check #####"
+        if [ -d ./error_log_dir ]; then
+                echo "##### error_log_dir already exist, so now writing error log on file #####"
+                echo -e ""
+        else
+                error_log_dir_path=`pwd`
+                echo "##### Make Dir ${error_log_dir_path}/error_log_dir #####"
+                echo -e ""
+                mkdir ${error_log_dir_path}/error_log_dir
+                if [[ $? -ne 0 ]]; then
+                        echo "### Can't Writing Error log ###"
+                        exit 1
+                fi
+        fi
+
+        grep -i -E "오류|error" $logpath/postgresql* >> ./error_log_dir/error_${datetime}.log
+
+        if [ -e ./error_log_dir/error_${datetime}.log ]; then
+                echo "##### Finish write file #####"
+        else
+                echo "##### FILE writing failed... #####"
+        fi
         echo -e ""
-	echo -e "##### Writing ERROR LOG ON FILE #####"
-	echo -e ""
-        grep -i -E "오류|error" $logpath/postgresql* >> ./log_error_list/error_$datetime.txt
-        echo -e ""
-	if [ -e ./log_error_list/error_$datetime.txt ]; then
-		echo "##### Finish write file #####"
-	else
-		echo "##### FILE writing failed... #####"
-	fi
-	echo -e ""
         read -p "##### Press Enter #####" ynread
         echo -e ""
 
