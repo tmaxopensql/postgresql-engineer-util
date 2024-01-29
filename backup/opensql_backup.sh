@@ -438,7 +438,9 @@ if [[ ${BAK_TYPE} == PHYSICAL ]]; then
 	        fi
 	fi
         calculate_Time $start_time $end_time
-	retentionPolicy
+	if [[ ${P_BAK_RETENTION_POLICY_ENABLE} =~ [yY] ]]; then
+		retentionPolicy
+ 	fi
    else
    	logging "Backup Failed..\nPlease See log!!\n${BAK_LOG_DIR}/backup-${DATETIME}.log"
 	if [[ -d ${BAK_DIR} ]]; then
